@@ -1,0 +1,83 @@
+
+{
+    "infura_keys": [
+
+        "41d67c1c49e94baaa8cc7f3dd617b321",
+        "af087225e2a14c9dba0ad531b9b4094b",
+        "2605eff3ed104a319c8926a1c672fe4a",
+        "1ae1777fb6804f5e911df0762110c885",
+        "891ad2c6a9db45de8e1429875362cf4f",
+        "1b481baae9984554a2351bc5f68befee",
+        "1a50d7111a2c4ec583cc29a1dd008112"
+    ],
+    "key_rotation_interval": 43200,
+    "key_swap_sleep_time": 300,
+    
+    "minimum_holder_threshold": 100,
+    "normal_scan_frequency": 25,
+    "low_holder_scan_frequency": 25,
+    "honeypot_age_threshold": 60,
+    "enable_honeypot_age_check": true,
+    "liquidity_multiplier": 10,
+    
+    "minimum_liquidity_tokens": 4,
+    "maximum_liquidity_tokens": 36,
+    "minimum_liquidity_dollars": 5000,
+    "maximum_buy_tax": 12,
+    "maximum_sell_tax": 12,
+    "max_honeypot_failures": 5,
+    
+    "pub_key": "0xCC2958f6Ead695AbD7679B8B507385A5356B5295",
+    "private": "4de8dc3d551dc188866d5cda4b65209b33b081530417c4dff88c96615f29f4c5",
+    "buy_amount": 0.01,
+    "gas_limit": 250000,
+    "gas_price": 0.000000060,
+    "node_rpc": "https://mainnet.infura.io/v3/891ad2c6a9db45de8e1429875362cf4f",
+    
+    "num_threads": 4,
+    "minimum_dext_score": 0,
+    "your_delay": 25,
+    "scanning": {
+    "rescan_interval": 160,
+    "max_rescan_count": 1000,
+    "remove_after_max_scans": true,
+    "honeypot_failure_limit": 5,
+    "liquidity_multiplier": 1
+},
+
+    "factory_address": "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
+    "weth_address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "factory_abi": [
+        {
+            "anonymous": false,
+            "inputs": [
+                {
+                    "indexed": true,
+                    "internalType": "address",
+                    "name": "token0",
+                    "type": "address"
+                },
+                {
+                    "indexed": true,
+                    "internalType": "address",
+                    "name": "token1",
+                    "type": "address"
+                },
+                {
+                    "indexed": false,
+                    "internalType": "address",
+                    "name": "pair",
+                    "type": "address"
+                },
+                {
+                    "indexed": false,
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "name": "PairCreated",
+            "type": "event"
+        }
+    ]
+}

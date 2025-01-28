@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' ws: wss:; style-src 'self' 'unsafe-inline';">
+    <title>Token Analyzer</title>
+    <meta name="description" content="Real-time token analysis dashboard">
+    <style>
+      #loading-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #0f172a;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      .spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid #64748b;
+        border-radius: 50%;
+        border-top-color: #38bdf8;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      .loading-text {
+        color: #e2e8f0;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 1.2rem;
+      }
+      @keyframes spin {
+        to {transform: rotate(360deg);}
+      }
+      #root:not(:empty) + #loading-screen {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="loading-screen">
+      <div class="spinner"></div>
+      <div class="loading-text">Loading Token Analyzer...</div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

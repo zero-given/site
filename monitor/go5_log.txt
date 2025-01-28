@@ -1,0 +1,27 @@
+2024-12-30 20:19:51 No data available for the token.
+2024-12-30 20:20:35 Selected Data Passed to Main Program:
+2024-12-30 20:20:35 {
+  "is_open_source": "1",
+  "is_proxy": "0",
+  "is_mintable": "0",
+  "owner_address": "",
+  "can_take_back_ownership": "0",
+  "owner_change_balance": "0",
+  "hidden_owner": "0",
+  "selfdestruct": "0",
+  "external_call": "0",
+  "buy_tax": "0",
+  "sell_tax": "0",
+  "anti_whale_modifiable": "0",
+  "cannot_buy": "0",
+  "cannot_sell_all": "0",
+  "creator_address": "0x42c6eb2b037fd5f8df6b9879386fdb1a6c8b96f3",
+  "token_symbol": "NINU",
+  "total_supply": "10000000000",
+  "trading_cooldown": "0",
+  "slippage_modifiable": "0",
+  "personal_slippage_modifiable": "0",
+  "owner_percent": "0",
+  "owner_balance": "0"
+}
+2024-12-30 20:20:35 Check Result:
