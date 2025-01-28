@@ -52,7 +52,11 @@ interface TokenCardProps {
   token: Token;
   expanded: boolean;
   onToggleExpand: (e: MouseEvent) => void;
-  trends?: { liquidity: 'up' | 'down' | 'stagnant', holders: 'up' | 'down' | 'stagnant' };
+  trends?: {
+    liquidity: 'up' | 'down' | 'stagnant';
+    holders: 'up' | 'down' | 'stagnant';
+  };
+  dynamicScaling?: boolean;
 }
 
 export const TokenEventCard: Component<TokenCardProps> = (props) => {
@@ -61,6 +65,9 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
   const [error, setError] = createSignal<string | null>(null);
   const [chartData, setChartData] = createSignal<TokenHistory[]>([]);
   const [debugInfo, setDebugInfo] = createSignal<string[]>([]);
+  const [isAdditionalInfoExpanded, setIsAdditionalInfoExpanded] = createSignal(false);
+  const [isTableExpanded, setIsTableExpanded] = createSignal(false);
+  const [isHistoryTableExpanded, setIsHistoryTableExpanded] = createSignal(false);
 
   // Add debug logging function
   const addDebug = (message: string) => {
@@ -218,16 +225,15 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
 
   return (
     <div 
-      class={`w-full transition-all duration-200 ${
+      class={`w-full transition-all duration-200 relative ${
         props.expanded ? 'bg-black/40 backdrop-blur-sm' : 'bg-black/20'
-      } rd-lg border border-gray-700/50 hover:border-gray-600/50 cursor-pointer overflow-hidden`}
-      onClick={(e) => props.onToggleExpand(e)}
+      } rd-lg border border-gray-700/50 hover:border-gray-600/50 overflow-hidden`}
     >
       <div class={`min-h-[84px] ${props.expanded ? '' : ''} transition-all duration-200`}>
         <Show
           when={props.expanded}
           fallback={
-            <div class="p-4">
+            <div class="p-4 cursor-pointer" onClick={(e) => props.onToggleExpand(e)}>
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <span class={`px-2 py-1 rd-md text-xs ${securityStatus[props.token.riskLevel]}`}>
@@ -262,286 +268,333 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
             </div>
           }
         >
-          <div class="p-6 flex flex-col gap-6">
-            {/* Expanded content */}
-            <div class="flex flex-col gap-6">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                  <span class={`px-3 py-1.5 rd-md text-sm ${securityStatus[props.token.riskLevel]}`}>
-                    {props.token.riskLevel.toUpperCase()}
-                  </span>
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <h2 class="text-xl fw-600">{props.token.tokenName}</h2>
-                      <div class="flex gap-1">
-                        <TrendBadge 
-                          trend={props.trends?.liquidity || 'stagnant'} 
-                          type="Liq"
-                        />
-                        <TrendBadge 
-                          trend={props.trends?.holders || 'stagnant'} 
-                          type="Holders"
-                        />
+          <div class="flex">
+            {/* Vertical Collapse Button Section */}
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                props.onToggleExpand(e);
+              }}
+              class="w-16 hover:bg-white/20 transition-colors text-yellow-200 fw-600 text-sm cursor-pointer border-r border-yellow-500/20 flex items-center justify-center"
+            >
+              <div class="rotate-90 tracking-wider">COLLAPSE</div>
+            </button>
+
+            <div class="flex-1 p-6 flex flex-col gap-6">
+              {/* Expanded content */}
+              <div class="flex flex-col gap-6">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-4">
+                    <span class={`px-3 py-1.5 rd-md text-sm ${securityStatus[props.token.riskLevel]}`}>
+                      {props.token.riskLevel.toUpperCase()}
+                    </span>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <h2 class="text-xl fw-600">{props.token.tokenName}</h2>
+                        <div class="flex gap-1">
+                          <TrendBadge 
+                            trend={props.trends?.liquidity || 'stagnant'} 
+                            type="Liq"
+                          />
+                          <TrendBadge 
+                            trend={props.trends?.holders || 'stagnant'} 
+                            type="Holders"
+                          />
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2 text-gray-400">
+                        <span>{props.token.tokenSymbol}</span>
+                        <span>•</span>
+                        <span>{props.token.tokenAgeHours.toFixed(1)}h old</span>
                       </div>
                     </div>
-                    <div class="flex items-center gap-2 text-gray-400">
-                      <span>{props.token.tokenSymbol}</span>
-                      <span>•</span>
-                      <span>{props.token.tokenAgeHours.toFixed(1)}h old</span>
-                    </div>
+                  </div>
+                  <div class="flex items-center gap-6">
+                    <SectionHeader 
+                      icon={<Activity size={16} class="text-blue-400" />} 
+                      title="Token Metrics" 
+                      onClick={() => setIsTableExpanded(!isTableExpanded())}
+                      isExpanded={isTableExpanded()}
+                    />
                   </div>
                 </div>
-                <div class="flex items-center gap-6">
-                  <div class="text-right">
-                    <div class="text-sm text-gray-400">Holders</div>
-                    <div class="text-lg fw-600">{props.token.gpHolderCount.toLocaleString()}</div>
-                  </div>
-                  <div class="text-right">
-                    <div class="text-sm text-gray-400">Liquidity</div>
-                    <div class="text-lg fw-600">
-                      ${props.token.hpLiquidityAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                
+                <Show when={isTableExpanded()}>
+                  <div class="grid grid-cols-4 gap-4 bg-black/20 p-4 rd">
+                    <div>
+                      <div class="text-sm text-gray-400">Time</div>
+                      <div class="text-sm">{new Date().toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div class="text-sm text-gray-400">Liquidity</div>
+                      <div class="text-sm">${props.token.hpLiquidityAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+                    </div>
+                    <div>
+                      <div class="text-sm text-gray-400">Holders</div>
+                      <div class="text-sm">{props.token.gpHolderCount.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div class="text-sm text-gray-400">LP Holders</div>
+                      <div class="text-sm">{props.token.gpLpHolderCount.toLocaleString()}</div>
                     </div>
                   </div>
-                </div>
-              </div>
-              
-              {/* Warning Reasons */}
-              <Show when={getWarningReasons().length > 0}>
-                <div class="bg-orange-100/10 p-4 rd">
-                  <div class="flex items-center gap-2 mb-2">
-                    <Info size={16} class="text-orange-400" />
-                    <h3 class="text-base fw-600 text-orange-400">Warning Reasons</h3>
+                </Show>
+
+                {/* Warning Reasons */}
+                <Show when={getWarningReasons().length > 0}>
+                  <div class="bg-orange-100/10 p-4 rd">
+                    <div class="flex items-center gap-2 mb-2">
+                      <Info size={16} class="text-orange-400" />
+                      <h3 class="text-base fw-600 text-orange-400">Warning Reasons</h3>
+                    </div>
+                    <ul class="list-disc list-inside space-y-1">
+                      {getWarningReasons().map(reason => (
+                        <li class="text-orange-200 text-sm">{reason}</li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul class="list-disc list-inside space-y-1">
-                    {getWarningReasons().map(reason => (
-                      <li class="text-orange-200 text-sm">{reason}</li>
-                    ))}
-                  </ul>
-                </div>
-              </Show>
+                </Show>
 
-              {/* Trading Info */}
-              <div>
-                <SectionHeader icon={<Activity size={16} class="text-blue-400" />} title="Trading Information" />
-                <div class="grid grid-cols-3 gap-4">
-                  <Field label="Buy Tax" value={`${props.token.gpBuyTax}%`} />
-                  <Field label="Sell Tax" value={`${props.token.gpSellTax}%`} />
-                  <Field label="Transfer Tax" value={`${props.token.hpTransferTax}%`} />
-                  <Field label="Buy Gas" value={props.token.hpBuyGasUsed.toLocaleString()} />
-                  <Field label="Sell Gas" value={props.token.hpSellGasUsed.toLocaleString()} />
-                  <Field label="Total Supply" value={Number(props.token.gpTotalSupply).toLocaleString()} />
-                  <Field label="Liquidity Amount" value={`$${props.token.hpLiquidityAmount.toLocaleString()}`} />
-                  <Field label="Pair Token0" value={props.token.hpPairToken0Symbol || 'N/A'} />
-                  <Field label="Pair Token1" value={props.token.hpPairToken1Symbol || 'N/A'} />
-                  <Field label="Pair Reserves0" value={props.token.hpPairReserves0} />
-                  <Field label="Pair Reserves1" value={props.token.hpPairReserves1} />
-                  <Field label="Pair Liquidity" value={`$${props.token.hpPairLiquidity.toLocaleString()}`} />
-                </div>
-              </div>
-
-              {/* Contract Info */}
-              <div>
-                <SectionHeader icon={<FileText size={16} class="text-purple-400" />} title="Contract Information" />
-                <div class="grid grid-cols-2 gap-4">
-                  <div class="col-span-2">
-                    <Field label="Token Address" value={props.token.tokenAddress} truncate />
-                    <Field label="Pair Address" value={props.token.pairAddress} truncate />
-                    <Field label="Creator" value={props.token.gpCreatorAddress} truncate />
-                    <Field label="Owner" value={props.token.gpOwnerAddress || 'No owner'} truncate />
-                    <Field label="Deployer" value={props.token.hpDeployerAddress || 'N/A'} truncate />
+                {/* Trading Info */}
+                <div>
+                  <SectionHeader icon={<Activity size={16} class="text-blue-400" />} title="Trading Information" />
+                  <div class="grid grid-cols-3 gap-4">
+                    <Field label="Buy Tax" value={`${props.token.gpBuyTax}%`} />
+                    <Field label="Sell Tax" value={`${props.token.gpSellTax}%`} />
+                    <Field label="Transfer Tax" value={`${props.token.hpTransferTax}%`} />
+                    <Field label="Buy Gas" value={props.token.hpBuyGasUsed.toLocaleString()} />
+                    <Field label="Sell Gas" value={props.token.hpSellGasUsed.toLocaleString()} />
+                    <Field label="Total Supply" value={Number(props.token.gpTotalSupply).toLocaleString()} />
+                    <Field label="Liquidity Amount" value={`$${props.token.hpLiquidityAmount.toLocaleString()}`} />
+                    <Field label="Pair Token0" value={props.token.hpPairToken0Symbol || 'N/A'} />
+                    <Field label="Pair Token1" value={props.token.hpPairToken1Symbol || 'N/A'} />
+                    <Field label="Pair Reserves0" value={props.token.hpPairReserves0} />
+                    <Field label="Pair Reserves1" value={props.token.hpPairReserves1} />
+                    <Field label="Pair Liquidity" value={`$${props.token.hpPairLiquidity.toLocaleString()}`} />
                   </div>
-                  <Field label="Age" value={`${props.token.tokenAgeHours.toFixed(1)} hours`} />
-                  <Field label="Decimals" value={props.token.tokenDecimals} />
-                  <Field label="Creation Time" value={new Date(Number(props.token.hpCreationTime) * 1000).toLocaleString()} />
-                  <Field label="Is Open Source" value={props.token.gpIsOpenSource ? 'Yes' : 'No'} />
-                  <Field label="Is Proxy" value={props.token.gpIsProxy ? 'Yes' : 'No'} />
-                  <Field label="Has Proxy Calls" value={props.token.gpHasProxyCalls ? 'Yes' : 'No'} />
-                  <Field label="Is Mintable" value={props.token.gpIsMintable ? 'Yes' : 'No'} />
-                  <Field label="Can Be Minted" value={props.token.gpCanBeMinted ? 'Yes' : 'No'} />
-                  <Field label="Self Destruct" value={props.token.gpSelfDestruct ? 'Yes' : 'No'} />
-                  <Field label="External Call" value={props.token.gpExternalCall ? 'Yes' : 'No'} />
+                </div>
+
+                {/* Contract Info */}
+                <div>
+                  <SectionHeader icon={<FileText size={16} class="text-purple-400" />} title="Contract Information" />
+                  <div class="grid grid-cols-2 gap-4">
+                    <div class="col-span-2">
+                      <Field label="Token Address" value={props.token.tokenAddress} truncate />
+                      <Field label="Pair Address" value={props.token.pairAddress} truncate />
+                      <Field label="Creator" value={props.token.gpCreatorAddress} truncate />
+                      <Field label="Owner" value={props.token.gpOwnerAddress || 'No owner'} truncate />
+                      <Field label="Deployer" value={props.token.hpDeployerAddress || 'N/A'} truncate />
+                    </div>
+                    <Field label="Age" value={`${props.token.tokenAgeHours.toFixed(1)} hours`} />
+                    <Field label="Decimals" value={props.token.tokenDecimals} />
+                    <Field label="Creation Time" value={new Date(Number(props.token.hpCreationTime) * 1000).toLocaleString()} />
+                    <Field label="Is Open Source" value={props.token.gpIsOpenSource ? 'Yes' : 'No'} />
+                    <Field label="Is Proxy" value={props.token.gpIsProxy ? 'Yes' : 'No'} />
+                    <Field label="Has Proxy Calls" value={props.token.gpHasProxyCalls ? 'Yes' : 'No'} />
+                    <Field label="Is Mintable" value={props.token.gpIsMintable ? 'Yes' : 'No'} />
+                    <Field label="Can Be Minted" value={props.token.gpCanBeMinted ? 'Yes' : 'No'} />
+                    <Field label="Self Destruct" value={props.token.gpSelfDestruct ? 'Yes' : 'No'} />
+                    <Field label="External Call" value={props.token.gpExternalCall ? 'Yes' : 'No'} />
+                  </div>
+                </div>
+
+                {/* Security Settings */}
+                <div>
+                  <SectionHeader icon={<Shield size={16} class="text-green-400" />} title="Security Settings" />
+                  <div class="grid grid-cols-2 gap-4">
+                    <Field label="Anti-Whale Modifiable" value={props.token.gpAntiWhaleModifiable ? 'Yes' : 'No'} />
+                    <Field label="Cannot Buy" value={props.token.gpCannotBuy ? 'Yes' : 'No'} />
+                    <Field label="Cannot Sell All" value={props.token.gpCannotSellAll ? 'Yes' : 'No'} />
+                    <Field label="Slippage Modifiable" value={props.token.gpSlippageModifiable ? 'Yes' : 'No'} />
+                    <Field label="Personal Slippage Modifiable" value={props.token.gpPersonalSlippageModifiable ? 'Yes' : 'No'} />
+                    <Field label="Trading Cooldown" value={props.token.gpTradingCooldown ? 'Yes' : 'No'} />
+                  </div>
+                </div>
+
+                {/* Holder Information */}
+                <div>
+                  <SectionHeader icon={<Users size={16} class="text-indigo-400" />} title="Holder Information" />
+                  <div class="grid grid-cols-2 gap-4">
+                    <Field label="Total Holders" value={props.token.gpHolderCount.toLocaleString()} />
+                    <Field label="LP Holders" value={props.token.gpLpHolderCount.toLocaleString()} />
+                    <Field label="Creator Balance" value={`${(Number(props.token.gpCreatorPercent) * 100).toFixed(2)}%`} />
+                    <Field label="Owner Balance" value={`${(Number(props.token.gpOwnerPercent) * 100).toFixed(2)}%`} />
+                    <Field label="Creator Balance Raw" value={props.token.gpCreatorBalance} />
+                    <Field label="Owner Balance Raw" value={props.token.gpOwnerBalance} />
+                    <Field label="LP Total Supply" value={props.token.gpLpTotalSupply} />
+                    <Field label="Total Scans" value={props.token.totalScans} />
+                    <Field label="Honeypot Failures" value={props.token.honeypotFailures} />
+                  </div>
+                </div>
+
+                {/* Additional Information */}
+                <div>
+                  <SectionHeader 
+                    icon={<Info size={16} class="text-yellow-400" />} 
+                    title="Additional Information" 
+                    onClick={() => setIsAdditionalInfoExpanded(!isAdditionalInfoExpanded())}
+                    isExpanded={isAdditionalInfoExpanded()}
+                  />
+                  <Show when={isAdditionalInfoExpanded()}>
+                    <div class="grid grid-cols-2 gap-4">
+                      <Field label="Status" value={props.token.status || 'N/A'} />
+                      <Field label="Last Error" value={props.token.lastError || 'None'} />
+                      <Show when={props.token.gpTrustList}>
+                        <div class="col-span-2">
+                          <Field label="Trust List" value={props.token.gpTrustList} />
+                        </div>
+                      </Show>
+                      <Show when={props.token.gpOtherPotentialRisks}>
+                        <div class="col-span-2">
+                          <Field label="Other Potential Risks" value={props.token.gpOtherPotentialRisks} />
+                        </div>
+                      </Show>
+                      <Show when={props.token.gpHolders}>
+                        <div class="col-span-2">
+                          <Field label="Holders" value={props.token.gpHolders} />
+                        </div>
+                      </Show>
+                      <Show when={props.token.gpLpHolders}>
+                        <div class="col-span-2">
+                          <Field label="LP Holders" value={props.token.gpLpHolders} />
+                        </div>
+                      </Show>
+                      <Show when={props.token.gpDexInfo}>
+                        <div class="col-span-2">
+                          <Field label="DEX Info" value={props.token.gpDexInfo} />
+                        </div>
+                      </Show>
+                    </div>
+                  </Show>
                 </div>
               </div>
 
-              {/* Security Settings */}
-              <div>
-                <SectionHeader icon={<Shield size={16} class="text-green-400" />} title="Security Settings" />
-                <div class="grid grid-cols-2 gap-4">
-                  <Field label="Anti-Whale Modifiable" value={props.token.gpAntiWhaleModifiable ? 'Yes' : 'No'} />
-                  <Field label="Cannot Buy" value={props.token.gpCannotBuy ? 'Yes' : 'No'} />
-                  <Field label="Cannot Sell All" value={props.token.gpCannotSellAll ? 'Yes' : 'No'} />
-                  <Field label="Slippage Modifiable" value={props.token.gpSlippageModifiable ? 'Yes' : 'No'} />
-                  <Field label="Personal Slippage Modifiable" value={props.token.gpPersonalSlippageModifiable ? 'Yes' : 'No'} />
-                  <Field label="Trading Cooldown" value={props.token.gpTradingCooldown ? 'Yes' : 'No'} />
-                </div>
-              </div>
-
-              {/* Holder Information */}
-              <div>
-                <SectionHeader icon={<Users size={16} class="text-indigo-400" />} title="Holder Information" />
-                <div class="grid grid-cols-2 gap-4">
-                  <Field label="Total Holders" value={props.token.gpHolderCount.toLocaleString()} />
-                  <Field label="LP Holders" value={props.token.gpLpHolderCount.toLocaleString()} />
-                  <Field label="Creator Balance" value={`${(Number(props.token.gpCreatorPercent) * 100).toFixed(2)}%`} />
-                  <Field label="Owner Balance" value={`${(Number(props.token.gpOwnerPercent) * 100).toFixed(2)}%`} />
-                  <Field label="Creator Balance Raw" value={props.token.gpCreatorBalance} />
-                  <Field label="Owner Balance Raw" value={props.token.gpOwnerBalance} />
-                  <Field label="LP Total Supply" value={props.token.gpLpTotalSupply} />
-                  <Field label="Total Scans" value={props.token.totalScans} />
-                  <Field label="Honeypot Failures" value={props.token.honeypotFailures} />
-                </div>
-              </div>
-
-              {/* Additional Information */}
-              <div>
-                <SectionHeader icon={<Info size={16} class="text-yellow-400" />} title="Additional Information" />
-                <div class="grid grid-cols-2 gap-4">
-                  <Field label="Status" value={props.token.status || 'N/A'} />
-                  <Field label="Last Error" value={props.token.lastError || 'None'} />
-                  <Show when={props.token.gpTrustList}>
-                    <div class="col-span-2">
-                      <Field label="Trust List" value={props.token.gpTrustList} />
-                    </div>
-                  </Show>
-                  <Show when={props.token.gpOtherPotentialRisks}>
-                    <div class="col-span-2">
-                      <Field label="Other Potential Risks" value={props.token.gpOtherPotentialRisks} />
-                    </div>
-                  </Show>
-                  <Show when={props.token.gpHolders}>
-                    <div class="col-span-2">
-                      <Field label="Holders" value={props.token.gpHolders} />
-                    </div>
-                  </Show>
-                  <Show when={props.token.gpLpHolders}>
-                    <div class="col-span-2">
-                      <Field label="LP Holders" value={props.token.gpLpHolders} />
-                    </div>
-                  </Show>
-                  <Show when={props.token.gpDexInfo}>
-                    <div class="col-span-2">
-                      <Field label="DEX Info" value={props.token.gpDexInfo} />
-                    </div>
+              {/* Charts Section */}
+              <div class="space-y-4 mt-6">
+                {/* Liquidity History */}
+                <div>
+                  <SectionHeader 
+                    icon={<Activity size={16} class="text-blue-400" />} 
+                    title={`Liquidity History (${history().length} points)`}
+                    trendDirection={props.trends?.liquidity || 'stagnant'}
+                  />
+                  <Show 
+                    when={!isLoading()} 
+                    fallback={
+                      <div class="w-full h-[200px] bg-gray-800/20 rd-lg animate-pulse" />
+                    }
+                  >
+                    <Show 
+                      when={!error() && history().length > 0} 
+                      fallback={
+                        <div class="w-full h-[200px] bg-black/20 rd flex items-center justify-center text-gray-400">
+                          {error() || 'No data available'}
+                        </div>
+                      }
+                    >
+                      <TokenChart 
+                        token={props.token}
+                        history={history()} 
+                        type="liquidity"
+                        dynamicScaling={props.dynamicScaling}
+                        onTrendUpdate={(trend) => {
+                          console.debug('[Chart] Liquidity trend update:', trend);
+                        }}
+                      />
+                    </Show>
                   </Show>
                 </div>
-              </div>
-            </div>
 
-            {/* Charts Section */}
-            <div class="space-y-4 mt-6">
-              {/* Liquidity History */}
-              <div>
+                {/* Holders History */}
+                <div>
+                  <SectionHeader 
+                    icon={<Users size={16} class="text-purple-400" />} 
+                    title={`Holders History (${history().length} points)`}
+                    trendDirection={props.trends?.holders || 'stagnant'}
+                  />
+                  <Show 
+                    when={!isLoading()} 
+                    fallback={
+                      <div class="w-full h-[200px] bg-gray-800/20 rd-lg animate-pulse" />
+                    }
+                  >
+                    <Show 
+                      when={!error() && history().length > 0} 
+                      fallback={
+                        <div class="w-full h-[200px] bg-black/20 rd flex items-center justify-center text-gray-400">
+                          {error() || 'No data available'}
+                        </div>
+                      }
+                    >
+                      <TokenChart 
+                        token={props.token}
+                        history={history()} 
+                        type="holders"
+                        dynamicScaling={props.dynamicScaling}
+                        onTrendUpdate={(trend) => {
+                          console.debug('[Chart] Holders trend update:', trend);
+                        }}
+                      />
+                    </Show>
+                  </Show>
+                </div>
+
+                {/* Debug Info */}
+                <Show when={debugInfo().length > 0}>
+                  <div class="bg-black/20 p-4 rd">
+                    <SectionHeader 
+                      icon={<Info size={16} class="text-gray-400" />} 
+                      title="Debug Info:" 
+                    />
+                    <div class="text-xs text-gray-400 font-mono whitespace-pre-wrap">
+                      {debugInfo().join('\n')}
+                    </div>
+                  </div>
+                </Show>
+              </div>
+
+              {/* Liquidity History Table */}
+              <div class="space-y-2 mt-6">
                 <SectionHeader 
                   icon={<Activity size={16} class="text-blue-400" />} 
-                  title={`Liquidity History (${history().length} points)`}
-                  trendDirection={props.trends?.liquidity || 'stagnant'}
+                  title="History Table"
+                  onClick={() => setIsHistoryTableExpanded(!isHistoryTableExpanded())}
+                  isExpanded={isHistoryTableExpanded()}
                 />
-                <Show 
-                  when={!isLoading()} 
-                  fallback={
-                    <div class="w-full h-[200px] bg-gray-800/20 rd-lg animate-pulse" />
-                  }
-                >
-                  <Show 
-                    when={!error() && history().length > 0} 
-                    fallback={
-                      <div class="w-full h-[200px] bg-black/20 rd flex items-center justify-center text-gray-400">
-                        {error() || 'No data available'}
+                <Show when={isHistoryTableExpanded()}>
+                  <div class="bg-black/20 p-4 rd">
+                    {isLoading() ? (
+                      <div class="text-gray-400">Loading history...</div>
+                    ) : error() ? (
+                      <div class="text-red-400">{error()}</div>
+                    ) : history().length === 0 ? (
+                      <div class="text-gray-400">No history available</div>
+                    ) : (
+                      <div>
+                        <table class="w-full">
+                          <thead class="sticky top-0 bg-black/80">
+                            <tr class="text-gray-400 text-xs">
+                              <th class="text-left py-2 px-2">Time</th>
+                              <th class="text-right py-2 px-2">Liquidity</th>
+                              <th class="text-right py-2 px-2">Holders</th>
+                              <th class="text-right py-2 px-2">LP Holders</th>
+                            </tr>
+                          </thead>
+                          <tbody class="text-xs">
+                            {history().map((record) => (
+                              <tr class="text-white border-t border-gray-800">
+                                <td class="py-2 px-2">{new Date(record.timestamp).toLocaleString()}</td>
+                                <td class="text-right py-2 px-2">${record.totalLiquidity.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                                <td class="text-right py-2 px-2">{record.holderCount.toLocaleString()}</td>
+                                <td class="text-right py-2 px-2">{record.lpHolderCount.toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    }
-                  >
-                    <TokenChart 
-                      token={props.token} 
-                      history={history()} 
-                      type="liquidity"
-                      onTrendUpdate={(trend) => {
-                        console.debug('[Chart] Liquidity trend update:', trend);
-                      }}
-                    />
-                  </Show>
-                </Show>
-              </div>
-
-              {/* Holders History */}
-              <div>
-                <SectionHeader 
-                  icon={<Users size={16} class="text-purple-400" />} 
-                  title={`Holders History (${history().length} points)`}
-                  trendDirection={props.trends?.holders || 'stagnant'}
-                />
-                <Show 
-                  when={!isLoading()} 
-                  fallback={
-                    <div class="w-full h-[200px] bg-gray-800/20 rd-lg animate-pulse" />
-                  }
-                >
-                  <Show 
-                    when={!error() && history().length > 0} 
-                    fallback={
-                      <div class="w-full h-[200px] bg-black/20 rd flex items-center justify-center text-gray-400">
-                        {error() || 'No data available'}
-                      </div>
-                    }
-                  >
-                    <TokenChart 
-                      token={props.token} 
-                      history={history()} 
-                      type="holders"
-                      onTrendUpdate={(trend) => {
-                        console.debug('[Chart] Holders trend update:', trend);
-                      }}
-                    />
-                  </Show>
-                </Show>
-              </div>
-
-              {/* Debug Info */}
-              <Show when={debugInfo().length > 0}>
-                <div class="bg-black/20 p-4 rd">
-                  <SectionHeader 
-                    icon={<Info size={16} class="text-gray-400" />} 
-                    title="Debug Info:" 
-                  />
-                  <div class="text-xs text-gray-400 font-mono whitespace-pre-wrap">
-                    {debugInfo().join('\n')}
+                    )}
                   </div>
-                </div>
-              </Show>
-            </div>
-
-            {/* Liquidity History Table */}
-            <div class="space-y-2 mt-6">
-              <div class="bg-black/20 p-4 rd">
-                {isLoading() ? (
-                  <div class="text-gray-400">Loading history...</div>
-                ) : error() ? (
-                  <div class="text-red-400">{error()}</div>
-                ) : history().length === 0 ? (
-                  <div class="text-gray-400">No history available</div>
-                ) : (
-                  <div>
-                    <table class="w-full">
-                      <thead class="sticky top-0 bg-black/80">
-                        <tr class="text-gray-400 text-xs">
-                          <th class="text-left py-2 px-2">Time</th>
-                          <th class="text-right py-2 px-2">Liquidity</th>
-                          <th class="text-right py-2 px-2">Holders</th>
-                          <th class="text-right py-2 px-2">LP Holders</th>
-                        </tr>
-                      </thead>
-                      <tbody class="text-xs">
-                        {history().map((record) => (
-                          <tr class="text-white border-t border-gray-800">
-                            <td class="py-2 px-2">{new Date(record.timestamp).toLocaleString()}</td>
-                            <td class="text-right py-2 px-2">${record.totalLiquidity.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                            <td class="text-right py-2 px-2">{record.holderCount.toLocaleString()}</td>
-                            <td class="text-right py-2 px-2">{record.lpHolderCount.toLocaleString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                </Show>
               </div>
             </div>
           </div>

@@ -1,7 +1,7 @@
 import { Component, createSignal, createMemo, onMount, createEffect, onCleanup } from 'solid-js';
 import { createVirtualizer, type VirtualItem, type Virtualizer } from '@tanstack/solid-virtual';
 import { TokenEventCard } from './TokenEventCard';
-import { Layout, List } from 'lucide-solid';
+import { Layout, List, LineChart, Activity } from 'lucide-solid';
 import { TrendBadge } from './TrendBadge';
 import type { Token, FilterState, ThemeColors } from '../types';
 
@@ -13,6 +13,7 @@ interface TokenEventsListProps {
 type SortField = 'age' | 'holders' | 'liquidity' | 'safetyScore';
 
 const STORAGE_KEY = 'tokenListFilters';
+const DYNAMIC_SCALING_KEY = 'chartDynamicScaling';
 
 const getRiskScore = (token: Token): number => {
   switch (token.riskLevel) {
@@ -590,6 +591,14 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
     URL.revokeObjectURL(url);
   };
 
+  // Add dynamic scaling state
+  const [isDynamicScaling, setIsDynamicScaling] = createSignal(localStorage.getItem(DYNAMIC_SCALING_KEY) === 'true');
+
+  // Save dynamic scaling state when it changes
+  createEffect(() => {
+    localStorage.setItem(DYNAMIC_SCALING_KEY, isDynamicScaling().toString());
+  });
+
   return (
     <div class="flex flex-col h-screen">
       {/* Filters Container */}
@@ -627,6 +636,16 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
                 title="Download debug logs"
               >
                 Download Logs
+              </button>
+              <button
+                class={`flex items-center gap-2 px-4 py-2 rd text-white/90 transition-colors text-sm ${
+                  isDynamicScaling() ? 'bg-blue-600/50 hover:bg-blue-500/50' : 'bg-gray-800/50 hover:bg-gray-700/50'
+                }`}
+                onClick={() => setIsDynamicScaling(prev => !prev)}
+                title="Toggle dynamic chart scaling"
+              >
+                <Activity size={16} />
+                <span>Dynamic Scaling: {isDynamicScaling() ? 'On' : 'Off'}</span>
               </button>
             </div>
             <div class="flex gap-8 text-white/90">
@@ -742,17 +761,13 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
                     isExpanded ? 'relative z-10' : 'z-0'
                   }`}
                 >
-                  <div 
-                    class={`w-full bg-black/20 backdrop-blur-sm rd-lg border border-gray-700/50 
-                      ${isExpanded ? 'shadow-xl ring-1 ring-gray-700/50' : 'hover:border-gray-600/50'}`}
-                  >
-                    <TokenEventCard
-                      token={token}
-                      expanded={isExpanded}
-                      onToggleExpand={(e) => handleTokenClick(token.tokenAddress, e)}
-                      trends={tokenTrends().get(token.tokenAddress)}
-                    />
-                  </div>
+                  <TokenEventCard
+                    token={token}
+                    expanded={isExpanded}
+                    onToggleExpand={(e) => handleTokenClick(token.tokenAddress, e)}
+                    trends={tokenTrends().get(token.tokenAddress)}
+                    dynamicScaling={isDynamicScaling()}
+                  />
                 </div>
               );
             })}
