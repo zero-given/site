@@ -1,0 +1,22 @@
+{
+  "dependencies": {
+    "@solid-primitives/storage": "^4.2.1",
+    "@tanstack/solid-virtual": "^3.11.2",
+    "flexsearch": "^0.7.43",
+    "lucide-solid": "^0.471.0",
+    "lz-string": "^1.5.0",
+    "solid-js": "^1.9.4",
+    "solid-transition-group": "^0.2.3"
+  },
+  "devDependencies": {
+    "@types/flexsearch": "^0.7.6",
+    "@types/lz-string": "^1.3.34",
+    "@unocss/preset-uno": "^65.4.0",
+    "@unocss/preset-web-fonts": "^65.4.0",
+    "@unocss/vite": "^65.4.0",
+    "terser": "^5.37.0",
+    "typescript": "^5.7.3",
+    "unocss": "^65.4.0",
+    "vite-plugin-solid": "^2.11.0"
+  }
+}
