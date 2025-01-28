@@ -40,10 +40,19 @@ const SectionHeader: Component<{
 );
 
 const Field: Component<{ label: string; value: any; truncate?: boolean; important?: boolean }> = (props) => (
-  <div class="mb-0.5">
-    <span class={`text-2xs fw-500 text-gray-400 ${props.important ? 'text-xs' : ''}`}>{props.label}: </span>
-    <span class={`text-2xs text-gray-200 ${props.truncate ? 'truncate block' : ''} ${props.important ? 'text-xs' : ''}`}>
-      {props.value === undefined || props.value === null ? 'N/A' : props.value.toString()}
+  <div class="mb-3 flex items-center gap-2">
+    <span class="text-sm fw-500 text-gray-400 whitespace-nowrap">{props.label}: </span>
+    <span class={`text-sm text-gray-200 ${props.truncate ? 'truncate' : ''}`}>
+      {props.label === "Token Address" ? (
+        <a 
+          href={`https://www.dextools.io/app/en/ether/pair-explorer/${props.value}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-blue-400 hover:text-blue-300 hover:underline"
+        >
+          {props.value}
+        </a>
+      ) : props.value === undefined || props.value === null ? 'N/A' : props.value.toString()}
     </span>
   </div>
 );
@@ -240,7 +249,8 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                     {props.token.riskLevel.toUpperCase()}
                   </span>
                   <div class="flex items-center gap-2">
-                    <h3 class="text-base fw-600">{props.token.tokenName}</h3>
+                    <h3 class="text-sm fw-600">{props.token.tokenName}</h3>
+                    <span class="text-xs text-gray-400">{props.token.tokenSymbol}</span>
                     <div class="flex gap-1">
                       <TrendBadge 
                         trend={props.trends?.liquidity || 'stagnant'} 
@@ -252,8 +262,34 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                         type="Holders"
                         size="sm"
                       />
+                      <span class={`px-2 py-0.5 rd text-2xs ${
+                        props.token.gpOwnerAddress === '0x0000000000000000000000000000000000000000' 
+                          ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+                          : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                      }`}>
+                        {props.token.gpOwnerAddress === '0x0000000000000000000000000000000000000000' ? 'RENOUNCED' : 'NOT RENOUNCED'}
+                      </span>
+                      {(() => {
+                        try {
+                          const lpHolders = JSON.parse(props.token.gpLpHolders || '[]');
+                          const lockedLp = lpHolders.find((holder: any) => holder.is_locked);
+                          if (lockedLp) {
+                            return (
+                              <span class="px-2 py-0.5 rd text-2xs bg-green-500/20 text-green-300 border border-green-500/30">
+                                LOCKED {(Number(lockedLp.percent) * 100).toFixed(2)}%
+                              </span>
+                            );
+                          }
+                          return (
+                            <span class="px-2 py-0.5 rd text-2xs bg-red-500/20 text-red-300 border border-red-500/30">
+                              UNLOCKED
+                            </span>
+                          );
+                        } catch {
+                          return null;
+                        }
+                      })()}
                     </div>
-                    <span class="text-sm text-gray-400">{props.token.tokenSymbol}</span>
                   </div>
                 </div>
                 <div class="flex items-center gap-4">
@@ -284,68 +320,70 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
               {/* Expanded content */}
               <div class="flex flex-col gap-6">
                 <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-4">
-                    <span class={`px-3 py-1.5 rd-md text-sm ${securityStatus[props.token.riskLevel]}`}>
+                  <div class="flex items-center gap-2">
+                    <span class={`px-2 py-1 rd-md text-xs ${securityStatus[props.token.riskLevel]}`}>
                       {props.token.riskLevel.toUpperCase()}
                     </span>
-                    <div>
-                      <div class="flex items-center gap-2">
-                        <h2 class="text-xl fw-600">{props.token.tokenName}</h2>
-                        <div class="flex gap-1">
-                          <TrendBadge 
-                            trend={props.trends?.liquidity || 'stagnant'} 
-                            type="Liq"
-                          />
-                          <TrendBadge 
-                            trend={props.trends?.holders || 'stagnant'} 
-                            type="Holders"
-                          />
-                        </div>
-                      </div>
-                      <div class="flex items-center gap-2 text-gray-400">
-                        <span>{props.token.tokenSymbol}</span>
-                        <span>•</span>
-                        <span>{props.token.tokenAgeHours.toFixed(1)}h old</span>
+                    <div class="flex items-center gap-2">
+                      <h3 class="text-sm fw-600">{props.token.tokenName}</h3>
+                      <span class="text-xs text-gray-400">{props.token.tokenSymbol}</span>
+                      <div class="flex gap-1">
+                        <TrendBadge 
+                          trend={props.trends?.liquidity || 'stagnant'} 
+                          type="Liq"
+                          size="sm"
+                        />
+                        <TrendBadge 
+                          trend={props.trends?.holders || 'stagnant'} 
+                          type="Holders"
+                          size="sm"
+                        />
+                        <span class={`px-2 py-0.5 rd text-2xs ${
+                          props.token.gpOwnerAddress === '0x0000000000000000000000000000000000000000' 
+                            ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+                            : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                        }`}>
+                          {props.token.gpOwnerAddress === '0x0000000000000000000000000000000000000000' ? 'RENOUNCED' : 'NOT RENOUNCED'}
+                        </span>
+                        {(() => {
+                          try {
+                            const lpHolders = JSON.parse(props.token.gpLpHolders || '[]');
+                            const lockedLp = lpHolders.find((holder: any) => holder.is_locked);
+                            if (lockedLp) {
+                              return (
+                                <span class="px-2 py-0.5 rd text-2xs bg-green-500/20 text-green-300 border border-green-500/30">
+                                  LOCKED {(Number(lockedLp.percent) * 100).toFixed(2)}%
+                                </span>
+                              );
+                            }
+                            return (
+                              <span class="px-2 py-0.5 rd text-2xs bg-red-500/20 text-red-300 border border-red-500/30">
+                                UNLOCKED
+                              </span>
+                            );
+                          } catch {
+                            return null;
+                          }
+                        })()}
                       </div>
                     </div>
                   </div>
-                  <div class="flex items-center gap-6">
-                    <SectionHeader 
-                      icon={<Activity size={16} class="text-blue-400" />} 
-                      title="Token Metrics" 
-                      onClick={() => setIsTableExpanded(!isTableExpanded())}
-                      isExpanded={isTableExpanded()}
-                    />
+                  <div class="flex items-center gap-4">
+                    <span class="text-sm">
+                      {props.token.gpHolderCount.toLocaleString()} holders
+                    </span>
+                    <span class="text-sm">
+                      ${props.token.hpLiquidityAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </span>
                   </div>
                 </div>
                 
-                <Show when={isTableExpanded()}>
-                  <div class="grid grid-cols-4 gap-4 bg-black/20 p-4 rd">
-                    <div>
-                      <div class="text-sm text-gray-400">Time</div>
-                      <div class="text-sm">{new Date().toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div class="text-sm text-gray-400">Liquidity</div>
-                      <div class="text-sm">${props.token.hpLiquidityAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-                    </div>
-                    <div>
-                      <div class="text-sm text-gray-400">Holders</div>
-                      <div class="text-sm">{props.token.gpHolderCount.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div class="text-sm text-gray-400">LP Holders</div>
-                      <div class="text-sm">{props.token.gpLpHolderCount.toLocaleString()}</div>
-                    </div>
-                  </div>
-                </Show>
-
                 {/* Warning Reasons */}
                 <Show when={getWarningReasons().length > 0}>
                   <div class="bg-orange-100/10 p-4 rd">
                     <div class="flex items-center gap-2 mb-2">
                       <Info size={16} class="text-orange-400" />
-                      <h3 class="text-base fw-600 text-orange-400">Warning Reasons</h3>
+                      <h3 class="text-sm fw-600 text-orange-400">Warning Reasons</h3>
                     </div>
                     <ul class="list-disc list-inside space-y-1">
                       {getWarningReasons().map(reason => (
@@ -355,10 +393,92 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                   </div>
                 </Show>
 
+                {/* Critical Information Section */}
+                <div>
+                  <SectionHeader
+                    icon={<Info size={14} class="text-blue-400" />}
+                    title="Critical Information"
+                  />
+                  <div class="grid grid-cols-2 gap-x-8 p-4">
+                    <div class="space-y-3">
+                      <Field label="Token Name" value={props.token.tokenName} important={true} />
+                      <Field label="Token Address" value={props.token.tokenAddress} truncate={true} important={true} />
+                      <Field label="Token Age" value={`${props.token.tokenAgeHours.toFixed(1)} hours`} important={true} />
+                    </div>
+                    <div class="space-y-3">
+                      <Field 
+                        label="Liquidity (honeypot.is)" 
+                        value={`$${props.token.hpLiquidityAmount.toLocaleString()}`} 
+                        important={true} 
+                      />
+                      <Field 
+                        label="Liquidity (go plus)" 
+                        value={`$${(() => {
+                          try {
+                            const dexInfo = JSON.parse(props.token.gpDexInfo || '[]');
+                            const liquidity = dexInfo[0]?.liquidity ? Number(dexInfo[0].liquidity) * 2 : 'N/A';
+                            return typeof liquidity === 'number' ? liquidity.toLocaleString() : liquidity;
+                          } catch {
+                            return 'N/A';
+                          }
+                        })()}`}
+                        important={true} 
+                      />
+                      <Field 
+                        label="Ownership Renounced" 
+                        value={props.token.gpOwnerAddress === '0x0000000000000000000000000000000000000000' ? 'Yes' : 'No'} 
+                        important={true} 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Liquidity Section */}
+                <div>
+                  <SectionHeader
+                    icon={<Lock size={14} class="text-green-400" />}
+                    title="Liquidity"
+                  />
+                  <div class="p-4">
+                    <div class="space-y-3">
+                      {(() => {
+                        try {
+                          const lpHolders = JSON.parse(props.token.gpLpHolders || '[]');
+                          return lpHolders.map((holder: any) => (
+                            <div class="flex items-center justify-between p-3 bg-black/20 rd">
+                              <div class="flex items-center gap-2">
+                                <span class={`px-2 py-0.5 rd text-2xs ${
+                                  holder.is_locked ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 
+                                  'bg-red-500/20 text-red-300 border border-red-500/30'
+                                }`}>
+                                  {holder.is_locked ? 'LOCKED' : 'UNLOCKED'}
+                                </span>
+                                <span class="text-sm text-gray-300 truncate max-w-[300px]" title={holder.address}>
+                                  {holder.tag || holder.address}
+                                </span>
+                              </div>
+                              <div class="flex items-center gap-4">
+                                <span class="text-sm text-gray-400">
+                                  {(Number(holder.percent) * 100).toFixed(2)}%
+                                </span>
+                                <span class="text-sm">
+                                  {Number(holder.balance).toFixed(4)} LP
+                                </span>
+                              </div>
+                            </div>
+                          ));
+                        } catch {
+                          return <div class="text-sm text-gray-400">No liquidity holder information available</div>;
+                        }
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Trading Info */}
                 <div>
                   <SectionHeader icon={<Activity size={16} class="text-blue-400" />} title="Trading Information" />
-                  <div class="grid grid-cols-3 gap-4">
+                  <div class="grid grid-cols-3 gap-4 p-4">
                     <Field label="Buy Tax" value={`${props.token.gpBuyTax}%`} />
                     <Field label="Sell Tax" value={`${props.token.gpSellTax}%`} />
                     <Field label="Transfer Tax" value={`${props.token.hpTransferTax}%`} />
@@ -377,7 +497,7 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                 {/* Contract Info */}
                 <div>
                   <SectionHeader icon={<FileText size={16} class="text-purple-400" />} title="Contract Information" />
-                  <div class="grid grid-cols-2 gap-4">
+                  <div class="grid grid-cols-2 gap-4 p-4">
                     <div class="col-span-2">
                       <Field label="Token Address" value={props.token.tokenAddress} truncate />
                       <Field label="Pair Address" value={props.token.pairAddress} truncate />
@@ -401,7 +521,7 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                 {/* Security Settings */}
                 <div>
                   <SectionHeader icon={<Shield size={16} class="text-green-400" />} title="Security Settings" />
-                  <div class="grid grid-cols-2 gap-4">
+                  <div class="grid grid-cols-2 gap-4 p-4">
                     <Field label="Anti-Whale Modifiable" value={props.token.gpAntiWhaleModifiable ? 'Yes' : 'No'} />
                     <Field label="Cannot Buy" value={props.token.gpCannotBuy ? 'Yes' : 'No'} />
                     <Field label="Cannot Sell All" value={props.token.gpCannotSellAll ? 'Yes' : 'No'} />
@@ -546,7 +666,7 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                       icon={<Info size={16} class="text-gray-400" />} 
                       title="Debug Info:" 
                     />
-                    <div class="text-xs text-gray-400 font-mono whitespace-pre-wrap">
+                    <div class="text-sm text-gray-400 font-mono whitespace-pre-wrap">
                       {debugInfo().join('\n')}
                     </div>
                   </div>
@@ -564,23 +684,23 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                 <Show when={isHistoryTableExpanded()}>
                   <div class="bg-black/20 p-4 rd">
                     {isLoading() ? (
-                      <div class="text-gray-400">Loading history...</div>
+                      <div class="text-sm text-gray-400">Loading history...</div>
                     ) : error() ? (
-                      <div class="text-red-400">{error()}</div>
+                      <div class="text-sm text-red-400">{error()}</div>
                     ) : history().length === 0 ? (
-                      <div class="text-gray-400">No history available</div>
+                      <div class="text-sm text-gray-400">No history available</div>
                     ) : (
                       <div>
                         <table class="w-full">
                           <thead class="sticky top-0 bg-black/80">
-                            <tr class="text-gray-400 text-xs">
+                            <tr class="text-gray-400 text-sm">
                               <th class="text-left py-2 px-2">Time</th>
                               <th class="text-right py-2 px-2">Liquidity</th>
                               <th class="text-right py-2 px-2">Holders</th>
                               <th class="text-right py-2 px-2">LP Holders</th>
                             </tr>
                           </thead>
-                          <tbody class="text-xs">
+                          <tbody class="text-sm">
                             {history().map((record) => (
                               <tr class="text-white border-t border-gray-800">
                                 <td class="py-2 px-2">{new Date(record.timestamp).toLocaleString()}</td>
