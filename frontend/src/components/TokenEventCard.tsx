@@ -1,6 +1,6 @@
 import { Component, Show, createSignal, onMount } from 'solid-js';
 import { Shield, Info, Activity, FileText, Lock, Users, ChevronUp, ChevronDown, Minus } from 'lucide-solid';
-import type { Token, TokenCardProps } from '../types';
+import type { Token, TokenHistory } from '../types';
 import { TokenChart } from './TokenLiquidityChart';
 import { TrendBadge } from './TrendBadge';
 
@@ -48,13 +48,11 @@ const Field: Component<{ label: string; value: any; truncate?: boolean; importan
   </div>
 );
 
-interface TokenHistory {
-  timestamp: number;
-  hpLiquidity: number;
-  gpLiquidity: number;
-  totalLiquidity: number;
-  holderCount: number;
-  lpHolderCount: number;
+interface TokenCardProps {
+  token: Token;
+  expanded: boolean;
+  onToggleExpand: (e: MouseEvent) => void;
+  trends?: { liquidity: 'up' | 'down' | 'stagnant', holders: 'up' | 'down' | 'stagnant' };
 }
 
 export const TokenEventCard: Component<TokenCardProps> = (props) => {
@@ -63,8 +61,6 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
   const [error, setError] = createSignal<string | null>(null);
   const [chartData, setChartData] = createSignal<TokenHistory[]>([]);
   const [debugInfo, setDebugInfo] = createSignal<string[]>([]);
-  const [liquidityTrend, setLiquidityTrend] = createSignal<'up' | 'down' | 'stagnant'>('stagnant');
-  const [holdersTrend, setHoldersTrend] = createSignal<'up' | 'down' | 'stagnant'>('stagnant');
 
   // Add debug logging function
   const addDebug = (message: string) => {
@@ -72,41 +68,8 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
     setDebugInfo(prev => [...prev, `${new Date().toISOString().split('T')[1]}: ${message}`]);
   };
 
-  // Add initial trend calculation
-  const calculateInitialTrend = (token: Token) => {
-    // Calculate liquidity trend from liq history fields
-    const liqTrend: 'up' | 'down' | 'stagnant' = (() => {
-      const liqValues = [
-        token.liq10, token.liq20, token.liq30, token.liq40, token.liq50,
-        token.liq60, token.liq70, token.liq80
-      ].filter(v => v !== undefined && v !== null);
-      
-      if (liqValues.length < 2) return 'stagnant';
-      const lastValue = liqValues[liqValues.length - 1];
-      const firstValue = liqValues[0];
-      const change = lastValue - firstValue;
-      return change > 0 ? 'up' : change < 0 ? 'down' : 'stagnant';
-    })();
-
-    // Calculate holders trend from holder count
-    const holderTrend: 'up' | 'down' | 'stagnant' = (() => {
-      const currentHolders = token.gpHolderCount;
-      const prevHolders = token.hpHolderCount;
-      if (!currentHolders || !prevHolders) return 'stagnant';
-      return currentHolders > prevHolders ? 'up' : 
-             currentHolders < prevHolders ? 'down' : 'stagnant';
-    })();
-
-    return { liqTrend, holderTrend };
-  };
-
   onMount(async () => {
     try {
-      // Set initial trends
-      const { liqTrend, holderTrend } = calculateInitialTrend(props.token);
-      setLiquidityTrend(liqTrend);
-      setHoldersTrend(holderTrend);
-
       addDebug(`Processing history for token: ${props.token.tokenAddress}`);
       
       // Check cache first
@@ -274,12 +237,12 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                     <h3 class="text-base fw-600">{props.token.tokenName}</h3>
                     <div class="flex gap-1">
                       <TrendBadge 
-                        trend={liquidityTrend()} 
+                        trend={props.trends?.liquidity || 'stagnant'} 
                         type="Liq"
                         size="sm"
                       />
                       <TrendBadge 
-                        trend={holdersTrend()} 
+                        trend={props.trends?.holders || 'stagnant'} 
                         type="Holders"
                         size="sm"
                       />
@@ -312,11 +275,11 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                       <h2 class="text-xl fw-600">{props.token.tokenName}</h2>
                       <div class="flex gap-1">
                         <TrendBadge 
-                          trend={liquidityTrend()} 
+                          trend={props.trends?.liquidity || 'stagnant'} 
                           type="Liq"
                         />
                         <TrendBadge 
-                          trend={holdersTrend()} 
+                          trend={props.trends?.holders || 'stagnant'} 
                           type="Holders"
                         />
                       </div>
@@ -471,7 +434,7 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                 <SectionHeader 
                   icon={<Activity size={16} class="text-blue-400" />} 
                   title={`Liquidity History (${history().length} points)`}
-                  trendDirection={liquidityTrend()}
+                  trendDirection={props.trends?.liquidity || 'stagnant'}
                 />
                 <Show 
                   when={!isLoading()} 
@@ -491,7 +454,9 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                       token={props.token} 
                       history={history()} 
                       type="liquidity"
-                      onTrendUpdate={setLiquidityTrend}
+                      onTrendUpdate={(trend) => {
+                        console.debug('[Chart] Liquidity trend update:', trend);
+                      }}
                     />
                   </Show>
                 </Show>
@@ -502,7 +467,7 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                 <SectionHeader 
                   icon={<Users size={16} class="text-purple-400" />} 
                   title={`Holders History (${history().length} points)`}
-                  trendDirection={holdersTrend()}
+                  trendDirection={props.trends?.holders || 'stagnant'}
                 />
                 <Show 
                   when={!isLoading()} 
@@ -522,7 +487,9 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                       token={props.token} 
                       history={history()} 
                       type="holders"
-                      onTrendUpdate={setHoldersTrend}
+                      onTrendUpdate={(trend) => {
+                        console.debug('[Chart] Holders trend update:', trend);
+                      }}
                     />
                   </Show>
                 </Show>

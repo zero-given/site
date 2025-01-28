@@ -379,18 +379,22 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
   };
 
   const [tokenHistories, setTokenHistories] = createSignal<Map<string, any[]>>(loadCachedHistories());
+  // Add new signals for trend storage
+  const [tokenTrends, setTokenTrends] = createSignal<Map<string, { liquidity: 'up' | 'down' | 'stagnant', holders: 'up' | 'down' | 'stagnant' }>>(new Map());
 
-  // Save histories to cache whenever they change
-  createEffect(() => {
-    const histories = tokenHistories();
-    const cacheData = {
-      timestamp: Date.now(),
-      data: Object.fromEntries(histories)
-    };
-    localStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(cacheData));
-  });
+  // Move trend calculation to a separate function that will be called once per token
+  const updateTokenTrends = (tokenAddress: string, history: any[]) => {
+    const liquidityTrend = calculateTrend(history, 'liquidity');
+    const holdersTrend = calculateTrend(history, 'holders');
+    
+    setTokenTrends(prev => {
+      const next = new Map(prev);
+      next.set(tokenAddress, { liquidity: liquidityTrend, holders: holdersTrend });
+      return next;
+    });
+  };
 
-  // Add function to fetch history
+  // Modify the history fetch to calculate trends when history is updated
   const fetchTokenHistory = async (tokenAddress: string) => {
     try {
       const response = await fetch(`/api/tokens/${tokenAddress}/history`);
@@ -405,6 +409,9 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
         next.set(tokenAddress, data.history);
         return next;
       });
+
+      // Calculate trends once when history is fetched
+      updateTokenTrends(tokenAddress, data.history);
     } catch (err) {
       console.error('[TokenEventsList] Error fetching token history:', err);
     }
@@ -423,9 +430,9 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
     });
   });
 
-  // Modify CompactRow to use the fetched history
+  // Modify CompactRow to use the stored trends instead of calculating them
   const CompactRow: Component<{ token: Token }> = (props) => {
-    const history = () => tokenHistories().get(props.token.tokenAddress) || [];
+    const trends = () => tokenTrends().get(props.token.tokenAddress) || { liquidity: 'stagnant', holders: 'stagnant' };
     
     return (
       <div class={`w-full bg-black/40 backdrop-blur-sm rd-lg border border-gray-700/50 hover:border-gray-600/50 transition-all duration-200 p-4 grid grid-cols-12 gap-4 items-center text-white mb-6`}>
@@ -435,12 +442,12 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
               <div class="fw-600 truncate">{props.token.tokenName}</div>
               <div class="flex shrink-0">
                 <TrendBadge 
-                  trend={calculateTrend(history(), 'liquidity')} 
+                  trend={trends().liquidity} 
                   type="Liq" 
                 />
                 <TrendBadge 
-                  trend={calculateTrend(history(), 'holders')} 
-                  type="Holders"
+                  trend={trends().holders} 
+                  type="Holders" 
                 />
               </div>
             </div>
@@ -528,8 +535,8 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
       return acc + (x - xMean) * (yPoints[i] - yMean);
     }, 0) / xPoints.reduce((acc, x) => acc + Math.pow(x - xMean, 2), 0);
     
-    // Use same threshold as chart
-    const threshold = 0.01 * yMean;
+    // Use same threshold as chart (0.05)
+    const threshold = 0.05;
     const result = Math.abs(slope) < threshold ? 'stagnant' : slope > 0 ? 'up' : 'down';
     
     console.debug(`[Trend ${type}] Calculation:`, {
@@ -743,6 +750,7 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
                       token={token}
                       expanded={isExpanded}
                       onToggleExpand={(e) => handleTokenClick(token.tokenAddress, e)}
+                      trends={tokenTrends().get(token.tokenAddress)}
                     />
                   </div>
                 </div>
