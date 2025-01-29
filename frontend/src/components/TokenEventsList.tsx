@@ -1,15 +1,13 @@
 import { Component, createSignal, createMemo, onMount, createEffect, onCleanup } from 'solid-js';
 import { createVirtualizer, type VirtualItem, type Virtualizer } from '@tanstack/solid-virtual';
 import { TokenEventCard } from './TokenEventCard';
-import { TokenTileCard } from './TokenTileCard';
-import { Layout, List, LineChart, Activity, LayoutGrid } from 'lucide-solid';
+import { Layout, List, LineChart, Activity } from 'lucide-solid';
 import { TrendBadge } from './TrendBadge';
 import type { Token, FilterState, ThemeColors } from '../types';
 
 interface TokenEventsListProps {
   tokens: Token[];
   onColorsChange: (colors: ThemeColors) => void;
-  onStatsChange: (filtered: number, expanded: number) => void;
 }
 
 type SortField = 'age' | 'holders' | 'liquidity' | 'safetyScore';
@@ -101,8 +99,6 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
       hideDanger: false,
       hideWarning: false,
       showOnlySafe: false,
-      hideNotRenounced: false,
-      hideUnlockedLiquidity: false,
       searchQuery: '',
       sortBy: 'age',
       sortDirection: 'desc',
@@ -128,20 +124,6 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
       if (currentFilters.hideDanger && token.riskLevel === 'danger') return false;
       if (currentFilters.hideWarning && token.riskLevel === 'warning') return false;
       if (currentFilters.showOnlySafe && token.riskLevel !== 'safe') return false;
-      
-      // New filters for ownership and liquidity
-      if (currentFilters.hideNotRenounced && token.gpOwnerAddress !== '0x0000000000000000000000000000000000000000') return false;
-      if (currentFilters.hideUnlockedLiquidity) {
-        try {
-          const lpHolders = JSON.parse(token.gpLpHolders || '[]');
-          const totalLocked = lpHolders.reduce((acc: number, holder: any) => 
-            acc + (holder.is_locked ? Number(holder.percent) * 100 : 0), 0
-          );
-          if (totalLocked < 90) return false;
-        } catch {
-          return false;
-        }
-      }
       
       // Apply min holders filter
       if (currentFilters.minHolders > 0 && token.gpHolderCount < currentFilters.minHolders) {
@@ -203,12 +185,7 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
     });
 
     logDebug('TokenEventsList: Filtered tokens: ' + result.length);
-    const finalResult = result.slice(0, currentFilters.maxRecords);
-    
-    // Update stats
-    props.onStatsChange(finalResult.length, expandedTokens().size);
-    
-    return finalResult;
+    return result.slice(0, currentFilters.maxRecords);
   });
 
   // Remove virtualizerKey and forceUpdateKey signals
@@ -459,205 +436,65 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
     const trends = () => tokenTrends().get(props.token.tokenAddress) || { liquidity: 'stagnant', holders: 'stagnant' };
     
     return (
-      <div class="relative flex items-stretch">
-        <div 
-          onClick={(e) => handleTokenClick(props.token.tokenAddress, e)}
-          class="flex-1 bg-black/20 backdrop-blur-sm rd-lg border border-gray-700/50 hover:border-gray-600/50 transition-all duration-200 p-3 md:p-4"
-        >
-          {/* Mobile Layout - Stacked */}
-          <div class="flex flex-col md:hidden gap-3">
-            {/* Top Section - Name, Status, Risk */}
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex-1 min-w-0">
-                <div class="fw-600 truncate text-sm">{props.token.tokenName}</div>
-                <div class="text-xs text-gray-400 truncate">{props.token.tokenSymbol}</div>
-              </div>
-              <div class="flex items-center gap-2 shrink-0">
-                <div class={`px-1.5 py-0.5 rd text-2xs ${
-                  props.token.gpOwnerAddress === '0x0000000000000000000000000000000000000000'
-                    ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                    : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                }`}>
-                  {props.token.gpOwnerAddress === '0x0000000000000000000000000000000000000000' ? 'Renounced' : 'Owned'}
-                </div>
-                <div class={`px-1.5 py-0.5 rd text-2xs ${
-                  props.token.riskLevel === 'safe' ? 'bg-green-100 text-green-800 border border-green-200' :
-                  props.token.riskLevel === 'warning' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                  'bg-red-100 text-red-800 border border-red-200'
-                }`}>
-                  {props.token.hpIsHoneypot ? 'HP' : props.token.riskLevel.slice(0,4).toUpperCase()}
-                </div>
+      <div class={`w-full bg-black/40 backdrop-blur-sm rd-lg border border-gray-700/50 hover:border-gray-600/50 transition-all duration-200 p-4 grid grid-cols-12 gap-4 items-center text-white mb-6`}>
+        <div class="col-span-2">
+          <div class="flex flex-col">
+            <div class="flex items-center gap-1 mb-1">
+              <div class="fw-600 truncate">{props.token.tokenName}</div>
+              <div class="flex shrink-0">
+                <TrendBadge 
+                  trend={trends().liquidity} 
+                  type="Liq" 
+                />
+                <TrendBadge 
+                  trend={trends().holders} 
+                  type="Holders" 
+                />
               </div>
             </div>
-
-            {/* Middle Section - Liquidity Lock and Trends */}
-            <div class="flex items-center justify-between gap-2">
-              <div class={`px-1.5 py-0.5 rd text-2xs whitespace-nowrap ${(() => {
-                try {
-                  const lpHolders = JSON.parse(props.token.gpLpHolders || '[]');
-                  const totalLocked = lpHolders.reduce((acc: number, holder: any) => 
-                    acc + (holder.is_locked ? Number(holder.percent) * 100 : 0), 0
-                  );
-                  return totalLocked > 90 
-                    ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                    : 'bg-red-500/20 text-red-300 border border-red-500/30';
-                } catch {
-                  return 'bg-red-500/20 text-red-300 border border-red-500/30';
-                }
-              })()}`}>
-                {(() => {
-                  try {
-                    const lpHolders = JSON.parse(props.token.gpLpHolders || '[]');
-                    const totalLocked = lpHolders.reduce((acc: number, holder: any) => 
-                      acc + (holder.is_locked ? Number(holder.percent) * 100 : 0), 0
-                    );
-                    return `${totalLocked.toFixed(1)}% Locked`;
-                  } catch {
-                    return 'Not Locked';
-                  }
-                })()}
-              </div>
-              <div class="flex items-center gap-1">
-                <TrendBadge trend={trends().liquidity} type="Liq" size="sm" />
-                <TrendBadge trend={trends().holders} type="Holders" size="sm" />
-              </div>
-            </div>
-
-            {/* Bottom Section - Stats */}
-            <div class="grid grid-cols-4 gap-2 text-2xs">
-              <div class="flex flex-col">
-                <div class="text-gray-400">Age</div>
-                <div class="mt-0.5">
-                  {(() => {
-                    const totalMinutes = Math.round(props.token.tokenAgeHours * 60);
-                    const hours = Math.floor(totalMinutes / 60);
-                    const minutes = totalMinutes % 60;
-                    if (hours > 0) {
-                      return `${hours}h ${minutes}m`;
-                    }
-                    return `${minutes}m`;
-                  })()}
-                </div>
-              </div>
-              <div class="flex flex-col">
-                <div class="text-gray-400">Liquidity</div>
-                <div class="mt-0.5 truncate">${props.token.hpLiquidityAmount.toLocaleString()}</div>
-              </div>
-              <div class="flex flex-col">
-                <div class="text-gray-400">Buy Tax</div>
-                <div class="mt-0.5">{props.token.gpBuyTax}%</div>
-              </div>
-              <div class="flex flex-col">
-                <div class="text-gray-400">Sell Tax</div>
-                <div class="mt-0.5">{props.token.gpSellTax}%</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop Layout - Single Row */}
-          <div class="hidden md:grid grid-cols-11 gap-4 items-center">
-            {/* Name and Symbol */}
-            <div class="col-span-2">
-              <div class="flex flex-col min-w-0">
-                <div class="fw-600 truncate text-base">{props.token.tokenName}</div>
-                <div class="text-sm text-gray-400 truncate">{props.token.tokenSymbol}</div>
-              </div>
-            </div>
-
-            {/* Status Badges and Trends */}
-            <div class="col-span-3 flex items-center justify-between gap-2">
-              <div class="flex justify-center shrink-0">
-                <div class={`px-2 py-0.5 rd text-xs ${
-                  props.token.gpOwnerAddress === '0x0000000000000000000000000000000000000000'
-                    ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                    : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                }`}>
-                  {props.token.gpOwnerAddress === '0x0000000000000000000000000000000000000000' ? 'Renounced' : 'Owned'}
-                </div>
-              </div>
-
-              <div class="flex justify-center shrink-0">
-                <div class={`px-2 py-0.5 rd text-xs whitespace-nowrap text-center ${(() => {
-                  try {
-                    const lpHolders = JSON.parse(props.token.gpLpHolders || '[]');
-                    const totalLocked = lpHolders.reduce((acc: number, holder: any) => 
-                      acc + (holder.is_locked ? Number(holder.percent) * 100 : 0), 0
-                    );
-                    return totalLocked > 90 
-                      ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                      : 'bg-red-500/20 text-red-300 border border-red-500/30';
-                  } catch {
-                    return 'bg-red-500/20 text-red-300 border border-red-500/30';
-                  }
-                })()}`}>
-                  {(() => {
-                    try {
-                      const lpHolders = JSON.parse(props.token.gpLpHolders || '[]');
-                      const totalLocked = lpHolders.reduce((acc: number, holder: any) => 
-                        acc + (holder.is_locked ? Number(holder.percent) * 100 : 0), 0
-                      );
-                      return `${totalLocked.toFixed(1)}%`;
-                    } catch {
-                      return 'Not Locked';
-                    }
-                  })()}
-                </div>
-              </div>
-
-              <div class="flex items-center gap-1 shrink-0">
-                <TrendBadge trend={trends().liquidity} type="Liq" />
-                <TrendBadge trend={trends().holders} type="Holders" />
-              </div>
-            </div>
-
-            {/* Age */}
-            <div class="col-span-1 flex flex-col min-w-0">
-              <div class="text-xs text-gray-400">Age</div>
-              <div class="px-2 py-0.5 rd text-xs bg-yellow-500/10 text-yellow-300 border border-yellow-500/30 truncate mt-1">
-                {(() => {
-                  const totalMinutes = Math.round(props.token.tokenAgeHours * 60);
-                  const hours = Math.floor(totalMinutes / 60);
-                  const minutes = totalMinutes % 60;
-                  if (hours > 0) {
-                    return `${hours}h ${minutes}m`;
-                  }
-                  return `${minutes}m`;
-                })()}
-              </div>
-            </div>
-
-            {/* Other Info */}
-            <div class="col-span-1 flex flex-col min-w-0">
-              <div class="text-xs text-gray-400">Liquidity</div>
-              <div class="text-sm mt-1 truncate">${props.token.hpLiquidityAmount.toLocaleString()}</div>
-            </div>
-            <div class="col-span-1 flex flex-col min-w-0">
-              <div class="text-xs text-gray-400">Holders</div>
-              <div class="text-sm mt-1 truncate">{props.token.gpHolderCount.toLocaleString()}</div>
-            </div>
-            <div class="col-span-1 flex flex-col min-w-0">
-              <div class="text-xs text-gray-400">Buy Tax</div>
-              <div class="text-sm mt-1 truncate">{props.token.gpBuyTax}%</div>
-            </div>
-            <div class="col-span-1 flex flex-col min-w-0">
-              <div class="text-xs text-gray-400">Sell Tax</div>
-              <div class="text-sm mt-1 truncate">{props.token.gpSellTax}%</div>
-            </div>
+            <div class="text-sm text-gray-400 truncate">{props.token.tokenSymbol}</div>
           </div>
         </div>
-
-        {/* Risk Level - Outside Container (Desktop Only) */}
-        <div 
-          onClick={(e) => handleTokenClick(props.token.tokenAddress, e)}
-          class={`hidden md:flex cursor-pointer items-center justify-center w-8 -ml-px rd-r-lg ${
-            props.token.riskLevel === 'safe' ? 'bg-green-100 text-green-800 border-y border-r border-green-200' :
-            props.token.riskLevel === 'warning' ? 'bg-yellow-100 text-yellow-800 border-y border-r border-yellow-200' :
-            'bg-red-100 text-red-800 border-y border-r border-red-200'
-          }`}
-        >
-          <div class="rotate-90 transform origin-center text-xs fw-600 whitespace-nowrap">
-            {props.token.hpIsHoneypot ? 'HP' : props.token.riskLevel.slice(0,4).toUpperCase()}
+        <div class="col-span-2 truncate text-sm">
+          <div class="text-gray-400">Address:</div>
+          <div>{props.token.tokenAddress.slice(0, 8)}...{props.token.tokenAddress.slice(-6)}</div>
+        </div>
+        <div class="col-span-1 text-sm">
+          <div class="text-gray-400">Age:</div>
+          <div>{props.token.tokenAgeHours.toFixed(1)}h</div>
+        </div>
+        <div class="col-span-1 text-sm">
+          <div class="text-gray-400">Liquidity:</div>
+          <div>${props.token.hpLiquidityAmount.toLocaleString()}</div>
+        </div>
+        <div class="col-span-1 text-sm">
+          <div class="text-gray-400">Holders:</div>
+          <div>{props.token.gpHolderCount.toLocaleString()}</div>
+        </div>
+        <div class="col-span-1 text-sm">
+          <div class="text-gray-400">Buy Tax:</div>
+          <div>{props.token.gpBuyTax}%</div>
+        </div>
+        <div class="col-span-1 text-sm">
+          <div class="text-gray-400">Sell Tax:</div>
+          <div>{props.token.gpSellTax}%</div>
+        </div>
+        <div class="col-span-2">
+          <div class={`text-center px-3 py-1 rd-full text-sm fw-600 ${
+            props.token.riskLevel === 'safe' ? 'bg-green-100 text-green-800 border border-green-200' :
+            props.token.riskLevel === 'warning' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+            'bg-red-100 text-red-800 border border-red-200'
+          }`}>
+            {props.token.hpIsHoneypot ? 'HONEYPOT' : props.token.riskLevel.toUpperCase()}
           </div>
+        </div>
+        <div class="col-span-1">
+          <button 
+            class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rd text-sm text-white transition-colors"
+            onClick={() => toggleTokenExpansion(props.token.tokenAddress)}
+          >
+            Expand
+          </button>
         </div>
       </div>
     );
@@ -762,262 +599,179 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
     localStorage.setItem(DYNAMIC_SCALING_KEY, isDynamicScaling().toString());
   });
 
-  const [viewMode, setViewMode] = createSignal<'list' | 'grid'>('list');
-
-  // Add effect to update stats when expanded tokens change
-  createEffect(() => {
-    const expanded = expandedTokens().size;
-    const filtered = filteredTokens().length;
-    props.onStatsChange(filtered, expanded);
-  });
-
   return (
-    <div class="min-h-full">
-      <div class="sticky top-0 z-50 bg-black/20 backdrop-blur-sm border-b border-gray-800">
-        <div class="w-full max-w-[1820px] mx-auto px-2 md:px-6">
-          <div class="mb-4 flex flex-col gap-4">
-            {/* Core controls */}
-            <div class="flex flex-col md:flex-row items-start gap-4 w-full">
-              {/* Main settings container - left aligned */}
-              <div class="flex flex-wrap items-center justify-start gap-4 w-full">
-                {/* Search and Sort */}
-                <div class="flex flex-wrap items-center justify-start gap-3 w-full md:w-auto">
-                  <input
-                    type="text"
-                    placeholder="Search tokens..."
-                    class="w-full md:w-[240px] px-3 py-2 bg-gray-800/50 rd border border-gray-700 text-white"
-                    value={filters().searchQuery}
-                    onInput={(e) => updateFilters(f => ({ ...f, searchQuery: e.currentTarget.value }))}
-                  />
-                  <select
-                    class="w-full md:w-[240px] px-3 py-2 bg-gray-800/50 rd border border-gray-700 text-white"
-                    value={filters().sortBy}
-                    onChange={(e) => updateFilters(f => ({ ...f, sortBy: e.currentTarget.value as any }))}
-                  >
-                    <option value="age">Sort by Age (Newest)</option>
-                    <option value="age_asc">Sort by Age (Oldest)</option>
-                    <option value="liquidity">Sort by Liquidity (Highest)</option>
-                    <option value="liquidity_asc">Sort by Liquidity (Lowest)</option>
-                    <option value="holders">Sort by Holders (Most)</option>
-                    <option value="holders_asc">Sort by Holders (Least)</option>
-                    <option value="safetyScore">Sort by Safety</option>
-                  </select>
-                </div>
+    <div class="flex flex-col h-screen">
+      {/* Filters Container */}
+      <div class="sticky top-0 z-50 bg-gradient-to-b from-black/95 to-black/90 backdrop-blur-xl border-b border-gray-800">
+        <div class="max-w-[1820px] mx-auto px-6 py-4">
+          <div class="mb-4 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+              <div class="text-white text-lg fw-600">Token List</div>
+              <button
+                class="flex items-center gap-2 px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rd text-white/90 transition-colors text-sm"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const currentTokens = filteredTokens();
+                  setExpandedTokens(prev => {
+                    const hasExpanded = currentTokens.some(token => prev.has(token.tokenAddress));
+                    return hasExpanded ? new Set<string>() : new Set(currentTokens.map(token => token.tokenAddress));
+                  });
+                }}
+              >
+                {expandedTokens().size > 0 ? (
+                  <>
+                    <List size={16} />
+                    <span>Collapse All</span>
+                  </>
+                ) : (
+                  <>
+                    <Layout size={16} />
+                    <span>Expand All</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={downloadLogs}
+                class="px-3 py-1 bg-gray-800/50 hover:bg-gray-700/50 rd text-white/90 transition-colors text-sm"
+                title="Download debug logs"
+              >
+                Download Logs
+              </button>
+              <button
+                class={`flex items-center gap-2 px-4 py-2 rd text-white/90 transition-colors text-sm ${
+                  isDynamicScaling() ? 'bg-blue-600/50 hover:bg-blue-500/50' : 'bg-gray-800/50 hover:bg-gray-700/50'
+                }`}
+                onClick={() => setIsDynamicScaling(prev => !prev)}
+                title="Toggle dynamic chart scaling"
+              >
+                <Activity size={16} />
+                <span>Dynamic Scaling: {isDynamicScaling() ? 'On' : 'Off'}</span>
+              </button>
+            </div>
+            <div class="flex gap-8 text-white/90">
+              <span>Total tokens: {props.tokens.length}</span>
+              <span>Filtered: {filteredTokens().length}</span>
+              <span>Expanded: {expandedTokens().size}</span>
+            </div>
+          </div>
+
+          {/* Filters Grid */}
+          <div class="grid grid-cols-12 gap-4">
+            {/* Search Input - Spans 3 columns */}
+            <div class="col-span-3">
+              <input
+                type="text"
+                placeholder="Search tokens..."
+                class="w-full px-3 py-2 bg-gray-800/50 rd border border-gray-700 text-white"
+                value={filters().searchQuery}
+                onInput={(e) => updateFilters(f => ({ ...f, searchQuery: e.currentTarget.value }))}
+              />
+            </div>
+
+            {/* Sort Dropdown - Spans 3 columns */}
+            <div class="col-span-3">
+              <select
+                class="w-full px-3 py-2 bg-gray-800/50 rd border border-gray-700 text-white"
+                value={filters().sortBy}
+                onChange={(e) => updateFilters(f => ({ ...f, sortBy: e.currentTarget.value as any }))}
+              >
+                <option value="age">Sort by Age (Newest)</option>
+                <option value="age_asc">Sort by Age (Oldest)</option>
+                <option value="liquidity">Sort by Liquidity (Highest)</option>
+                <option value="liquidity_asc">Sort by Liquidity (Lowest)</option>
+                <option value="holders">Sort by Holders (Most)</option>
+                <option value="holders_asc">Sort by Holders (Least)</option>
+                <option value="safetyScore">Sort by Safety</option>
+              </select>
+            </div>
+
+            {/* Risk Level Filters - Spans 4 columns */}
+            <div class="col-span-4 flex items-center gap-4">
+              <div class="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="hideHoneypots"
+                  checked={filters().hideHoneypots}
+                  onChange={(e) => updateFilters(f => ({ ...f, hideHoneypots: e.currentTarget.checked }))}
+                />
+                <label for="hideHoneypots" class="text-white/90">Hide Honeypots</label>
+              </div>
+
+              <div class="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="hideWarning"
+                  checked={filters().hideWarning}
+                  onChange={(e) => updateFilters(f => ({ ...f, hideWarning: e.currentTarget.checked }))}
+                />
+                <label for="hideWarning" class="text-white/90">Hide Warning</label>
+              </div>
+
+              <div class="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="hideDanger"
+                  checked={filters().hideDanger}
+                  onChange={(e) => updateFilters(f => ({ ...f, hideDanger: e.currentTarget.checked }))}
+                />
+                <label for="hideDanger" class="text-white/90">Hide Danger</label>
               </div>
             </div>
 
-            {/* Secondary controls */}
-            <div class="flex flex-wrap items-center justify-start gap-4 w-full">
-              {/* View toggles and actions */}
-              <div class="flex flex-wrap items-center justify-start gap-3">
-                <div class="flex items-center gap-2">
-                  <button
-                    class="flex items-center gap-2 px-3 py-1.5 bg-gray-800/50 hover:bg-gray-700/50 rd text-white/90 transition-colors text-sm"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      const currentTokens = filteredTokens();
-                      setExpandedTokens(prev => {
-                        const hasExpanded = currentTokens.some(token => prev.has(token.tokenAddress));
-                        return hasExpanded ? new Set<string>() : new Set(currentTokens.map(token => token.tokenAddress));
-                      });
-                    }}
-                  >
-                    {expandedTokens().size > 0 ? (
-                      <>
-                        <List size={16} />
-                        <span>Collapse All</span>
-                      </>
-                    ) : (
-                      <>
-                        <Layout size={16} />
-                        <span>Expand All</span>
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={downloadLogs}
-                    class="px-3 py-1.5 bg-gray-800/50 hover:bg-gray-700/50 rd text-white/90 transition-colors text-sm"
-                    title="Download debug logs"
-                  >
-                    Download Logs
-                  </button>
-                  <button
-                    class={`flex items-center gap-2 px-3 py-1.5 rd text-white/90 transition-colors text-sm ${
-                      isDynamicScaling() ? 'bg-blue-600/50 hover:bg-blue-500/50' : 'bg-gray-800/50 hover:bg-gray-700/50'
-                    }`}
-                    onClick={() => setIsDynamicScaling(prev => !prev)}
-                    title="Toggle dynamic chart scaling"
-                  >
-                    <Activity size={16} />
-                    <span>Dynamic Scaling</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Filter inputs */}
-              <div class="flex flex-wrap items-center justify-start gap-3">
-                <div class="flex items-center gap-1.5">
-                  <label for="minHolders" class="text-white/90 text-xs">Min Holders:</label>
-                  <input
-                    id="minHolders"
-                    type="number"
-                    placeholder="0"
-                    class="w-20 px-2 py-1 bg-gray-800/50 rd border border-gray-700 text-white text-sm"
-                    value={filters().minHolders}
-                    onInput={(e) => updateFilters(f => ({ ...f, minHolders: parseInt(e.currentTarget.value) || 0 }))}
-                  />
-                </div>
-                <div class="flex items-center gap-1.5">
-                  <label for="minLiquidity" class="text-white/90 text-xs">Min Liquidity ($):</label>
-                  <input
-                    id="minLiquidity"
-                    type="number"
-                    placeholder="0"
-                    class="w-20 px-2 py-1 bg-gray-800/50 rd border border-gray-700 text-white text-sm"
-                    value={filters().minLiquidity}
-                    onInput={(e) => updateFilters(f => ({ ...f, minLiquidity: parseInt(e.currentTarget.value) || 0 }))}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Risk Level Filters */}
-            <div class="flex flex-wrap items-center justify-start gap-4 w-full">
-              <div class="flex flex-wrap items-center justify-start gap-3">
-                <div class="flex items-center space-x-1.5">
-                  <input
-                    type="checkbox"
-                    id="hideHoneypots"
-                    checked={filters().hideHoneypots}
-                    onChange={(e) => updateFilters(f => ({ ...f, hideHoneypots: e.currentTarget.checked }))}
-                  />
-                  <label for="hideHoneypots" class="text-white/90 text-xs">Hide Honeypots</label>
-                </div>
-
-                <div class="flex items-center space-x-1.5">
-                  <input
-                    type="checkbox"
-                    id="hideWarning"
-                    checked={filters().hideWarning}
-                    onChange={(e) => updateFilters(f => ({ ...f, hideWarning: e.currentTarget.checked }))}
-                  />
-                  <label for="hideWarning" class="text-white/90 text-xs">Hide Warning</label>
-                </div>
-
-                <div class="flex items-center space-x-1.5">
-                  <input
-                    type="checkbox"
-                    id="hideDanger"
-                    checked={filters().hideDanger}
-                    onChange={(e) => updateFilters(f => ({ ...f, hideDanger: e.currentTarget.checked }))}
-                  />
-                  <label for="hideDanger" class="text-white/90 text-xs">Hide Danger</label>
-                </div>
-
-                <div class="flex items-center space-x-1.5">
-                  <input
-                    type="checkbox"
-                    id="hideNotRenounced"
-                    checked={filters().hideNotRenounced}
-                    onChange={(e) => updateFilters(f => ({ ...f, hideNotRenounced: e.currentTarget.checked }))}
-                  />
-                  <label for="hideNotRenounced" class="text-white/90 text-xs">Hide Not Renounced</label>
-                </div>
-
-                <div class="flex items-center space-x-1.5">
-                  <input
-                    type="checkbox"
-                    id="hideUnlockedLiquidity"
-                    checked={filters().hideUnlockedLiquidity}
-                    onChange={(e) => updateFilters(f => ({ ...f, hideUnlockedLiquidity: e.currentTarget.checked }))}
-                  />
-                  <label for="hideUnlockedLiquidity" class="text-white/90 text-xs">Hide Unlocked Liquidity</label>
-                </div>
+            {/* Min Filters and View Toggle - Spans 2 columns */}
+            <div class="col-span-2 flex items-center justify-end gap-4">
+              <div class="flex items-center gap-2">
+                <span class="text-white/60 text-xs whitespace-nowrap">Min:</span>
+                <input
+                  type="number"
+                  placeholder="Holders"
+                  class="w-20 px-2 py-1 bg-gray-800/50 rd border border-gray-700 text-white text-sm"
+                  value={filters().minHolders}
+                  onInput={(e) => updateFilters(f => ({ ...f, minHolders: parseInt(e.currentTarget.value) || 0 }))}
+                />
+                <input
+                  type="number"
+                  placeholder="Liq($)"
+                  class="w-20 px-2 py-1 bg-gray-800/50 rd border border-gray-700 text-white text-sm"
+                  value={filters().minLiquidity}
+                  onInput={(e) => updateFilters(f => ({ ...f, minLiquidity: parseInt(e.currentTarget.value) || 0 }))}
+                />
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* List Container */}
+      {/* List Container - Flexbox Layout */}
       <div 
         ref={scrollContainerRef}
         class="flex-1 overflow-auto"
       >
-        <div class={`w-full max-w-[1820px] mx-auto px-2 md:px-6 pt-4 md:pt-6 transition-all duration-300`}>
-          {viewMode() === 'list' ? (
-            // List View
-            <div class="flex flex-col gap-2 md:gap-4">
-              {filteredTokens().map((token, index) => {
-                const isExpanded = expandedTokens().has(token.tokenAddress);
-                
-                return (
-                  <div
-                    data-index={index}
-                    data-token={token.tokenAddress}
-                    class={`w-full transition-all duration-300 ease-in-out ${
-                      isExpanded ? 'relative z-10' : 'z-0'
-                    }`}
-                  >
-                    {isExpanded ? (
-                      <TokenEventCard
-                        token={token}
-                        expanded={true}
-                        onToggleExpand={(e) => handleTokenClick(token.tokenAddress, e)}
-                        trends={tokenTrends().get(token.tokenAddress)}
-                        dynamicScaling={isDynamicScaling()}
-                      />
-                    ) : (
-                      <CompactRow token={token} />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            // Grid View
-            <div class="relative">
-              {expandedTokens().size > 0 ? (
-                // Show expanded card in full width container
-                <div class="w-full">
-                  {filteredTokens().map((token, index) => {
-                    const isExpanded = expandedTokens().has(token.tokenAddress);
-                    return isExpanded ? (
-                      <div 
-                        data-index={index}
-                        data-token={token.tokenAddress}
-                        class="w-full transition-all duration-300"
-                      >
-                        <TokenEventCard
-                          token={token}
-                          expanded={true}
-                          onToggleExpand={(e) => handleTokenClick(token.tokenAddress, e)}
-                          trends={tokenTrends().get(token.tokenAddress)}
-                          dynamicScaling={isDynamicScaling()}
-                        />
-                      </div>
-                    ) : null;
-                  })}
+        <div class="max-w-[1400px] mx-auto px-4 py-4">
+          {/* Stack tokens vertically with margins */}
+          <div class="flex flex-col gap-4">
+            {filteredTokens().map((token, index) => {
+              const isExpanded = expandedTokens().has(token.tokenAddress);
+              
+              return (
+                <div
+                  data-index={index}
+                  data-token={token.tokenAddress}
+                  class={`w-full transition-all duration-300 ease-in-out ${
+                    isExpanded ? 'relative z-10' : 'z-0'
+                  }`}
+                >
+                  <TokenEventCard
+                    token={token}
+                    expanded={isExpanded}
+                    onToggleExpand={(e) => handleTokenClick(token.tokenAddress, e)}
+                    trends={tokenTrends().get(token.tokenAddress)}
+                    dynamicScaling={isDynamicScaling()}
+                  />
                 </div>
-              ) : (
-                // Show grid of tiles
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
-                  {filteredTokens().map((token, index) => (
-                    <div
-                      data-index={index}
-                      data-token={token.tokenAddress}
-                    >
-                      <TokenTileCard
-                        token={token}
-                        onClick={(e) => handleTokenClick(token.tokenAddress, e)}
-                        trends={tokenTrends().get(token.tokenAddress)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

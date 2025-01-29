@@ -124,8 +124,6 @@ export interface FilterState {
   hideDanger: boolean;
   hideWarning: boolean;
   showOnlySafe: boolean;
-  hideNotRenounced: boolean;
-  hideUnlockedLiquidity: boolean;
   searchQuery: string;
   sortBy: SortField;
   sortDirection: SortDirection;
