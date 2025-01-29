@@ -234,9 +234,7 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
 
   return (
     <div 
-      class={`w-full transition-all duration-200 relative ${
-        props.expanded ? 'bg-black/40 backdrop-blur-sm' : 'bg-black/20'
-      } rd-lg border border-gray-700/50 hover:border-gray-600/50 overflow-hidden`}
+      class={`w-full transition-all duration-200 relative bg-black/20 backdrop-blur-sm rd-lg border border-gray-700/50 hover:border-gray-600/50 overflow-hidden`}
     >
       <div class={`min-h-[84px] ${props.expanded ? '' : ''} transition-all duration-200`}>
         <Show
@@ -433,44 +431,118 @@ export const TokenEventCard: Component<TokenCardProps> = (props) => {
                   </div>
                 </div>
 
-                {/* Liquidity Section */}
+                {/* Liquidity Information */}
                 <div>
-                  <SectionHeader
-                    icon={<Lock size={14} class="text-green-400" />}
-                    title="Liquidity"
-                  />
-                  <div class="p-4">
-                    <div class="space-y-3">
+                  <SectionHeader icon={<Lock size={16} class="text-blue-400" />} title="Liquidity Information" />
+                  <div class="grid grid-cols-2 gap-4 p-4">
+                    {/* DEX Information */}
+                    <div>
+                      <h5 class="text-xs fw-600 text-gray-400 uppercase mb-3">DEX Information</h5>
                       {(() => {
                         try {
-                          const lpHolders = JSON.parse(props.token.gpLpHolders || '[]');
-                          return lpHolders.map((holder: any) => (
-                            <div class="flex items-center justify-between p-3 bg-black/20 rd">
-                              <div class="flex items-center gap-2">
-                                <span class={`px-2 py-0.5 rd text-2xs ${
-                                  holder.is_locked ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 
-                                  'bg-red-500/20 text-red-300 border border-red-500/30'
-                                }`}>
-                                  {holder.is_locked ? 'LOCKED' : 'UNLOCKED'}
-                                </span>
-                                <span class="text-sm text-gray-300 truncate max-w-[300px]" title={holder.address}>
-                                  {holder.tag || holder.address}
-                                </span>
-                              </div>
-                              <div class="flex items-center gap-4">
-                                <span class="text-sm text-gray-400">
-                                  {(Number(holder.percent) * 100).toFixed(2)}%
-                                </span>
-                                <span class="text-sm">
-                                  {Number(holder.balance).toFixed(4)} LP
-                                </span>
+                          const dexInfo = JSON.parse(props.token.gpDexInfo || '[]');
+                          return dexInfo.map((dex: any) => (
+                            <div class="mb-2">
+                              <Field 
+                                label={dex.name} 
+                                value={`$${Number(dex.liquidity).toLocaleString()}`} 
+                              />
+                              <div class="text-xs text-gray-400 ml-4">
+                                Type: {dex.liquidity_type}
+                                <br />
+                                Pair: {dex.pair}
                               </div>
                             </div>
                           ));
                         } catch {
-                          return <div class="text-sm text-gray-400">No liquidity holder information available</div>;
+                          return <Field label="DEX Info" value="N/A" />;
                         }
                       })()}
+                    </div>
+
+                    {/* LP Holder Information */}
+                    <div>
+                      <h5 class="text-xs fw-600 text-gray-400 uppercase mb-3">LP Holders</h5>
+                      {(() => {
+                        try {
+                          const lpHolders = JSON.parse(props.token.gpLpHolders || '[]');
+                          const totalLocked = lpHolders.reduce((acc: number, holder: any) => 
+                            acc + (holder.is_locked ? Number(holder.percent) * 100 : 0), 0
+                          );
+
+                          return (
+                            <>
+                              <div class={`mb-3 text-sm fw-600 ${
+                                totalLocked > 90 ? 'text-green-400' :
+                                totalLocked > 50 ? 'text-yellow-400' :
+                                'text-red-400'
+                              }`}>
+                                Total Locked: {totalLocked.toFixed(2)}%
+                              </div>
+                              {lpHolders.map((holder: any) => (
+                                <div class="mb-2 text-sm">
+                                  <div class="flex items-center gap-2">
+                                    <span class="text-gray-200 break-all">
+                                      {holder.tag || holder.address}
+                                    </span>
+                                    <div class="flex gap-1 shrink-0">
+                                      {holder.is_locked && (
+                                        <span class="px-1.5 py-0.5 text-xs bg-green-500/20 text-green-300 border border-green-500/30 rd">
+                                          Locked
+                                        </span>
+                                      )}
+                                      {holder.address === props.token.gpOwnerAddress && (
+                                        <span class="px-1.5 py-0.5 text-xs bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 rd">
+                                          Owner
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div class="text-xs text-gray-400 ml-4">
+                                    Balance: {(Number(holder.percent) * 100).toFixed(2)}%
+                                    {holder.is_contract === 1 && ' (Contract)'}
+                                  </div>
+                                </div>
+                              ))}
+                            </>
+                          );
+                        } catch {
+                          return <Field label="LP Holders" value="N/A" />;
+                        }
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Settings Box */}
+                <div>
+                  <SectionHeader
+                    icon={<Shield size={14} class="text-purple-400" />}
+                    title="Token Settings"
+                  />
+                  <div class="grid grid-cols-3 gap-6 p-4">
+                    {/* Token Info */}
+                    <div class="space-y-2">
+                      <h5 class="text-xs fw-600 text-gray-400 uppercase mb-3">Token Info</h5>
+                      <Field label="Buy Tax" value={`${props.token.gpBuyTax}%`} />
+                      <Field label="Sell Tax" value={`${props.token.gpSellTax}%`} />
+                      <Field label="Transfer Tax" value={`${props.token.hpTransferTax}%`} />
+                    </div>
+
+                    {/* Gas Info */}
+                    <div class="space-y-2">
+                      <h5 class="text-xs fw-600 text-gray-400 uppercase mb-3">Gas Info</h5>
+                      <Field label="Buy Gas" value={props.token.hpBuyGasUsed.toLocaleString()} />
+                      <Field label="Sell Gas" value={props.token.hpSellGasUsed.toLocaleString()} />
+                      <Field label="Total Supply" value={Number(props.token.gpTotalSupply).toLocaleString()} />
+                    </div>
+
+                    {/* Pair Info */}
+                    <div class="space-y-2">
+                      <h5 class="text-xs fw-600 text-gray-400 uppercase mb-3">Pair Info</h5>
+                      <Field label="Pair Token0" value={props.token.hpPairToken0Symbol || 'N/A'} />
+                      <Field label="Pair Token1" value={props.token.hpPairToken1Symbol || 'N/A'} />
+                      <Field label="Pair Liquidity" value={`$${props.token.hpPairLiquidity.toLocaleString()}`} />
                     </div>
                   </div>
                 </div>

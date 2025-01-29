@@ -1,7 +1,8 @@
 import { Component, createSignal, createMemo, onMount, createEffect, onCleanup } from 'solid-js';
 import { createVirtualizer, type VirtualItem, type Virtualizer } from '@tanstack/solid-virtual';
 import { TokenEventCard } from './TokenEventCard';
-import { Layout, List, LineChart, Activity } from 'lucide-solid';
+import { TokenTileCard } from './TokenTileCard';
+import { Layout, List, LineChart, Activity, LayoutGrid } from 'lucide-solid';
 import { TrendBadge } from './TrendBadge';
 import type { Token, FilterState, ThemeColors } from '../types';
 
@@ -99,6 +100,8 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
       hideDanger: false,
       hideWarning: false,
       showOnlySafe: false,
+      hideNotRenounced: false,
+      hideUnlockedLiquidity: false,
       searchQuery: '',
       sortBy: 'age',
       sortDirection: 'desc',
@@ -124,6 +127,20 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
       if (currentFilters.hideDanger && token.riskLevel === 'danger') return false;
       if (currentFilters.hideWarning && token.riskLevel === 'warning') return false;
       if (currentFilters.showOnlySafe && token.riskLevel !== 'safe') return false;
+      
+      // New filters for ownership and liquidity
+      if (currentFilters.hideNotRenounced && token.gpOwnerAddress !== '0x0000000000000000000000000000000000000000') return false;
+      if (currentFilters.hideUnlockedLiquidity) {
+        try {
+          const lpHolders = JSON.parse(token.gpLpHolders || '[]');
+          const totalLocked = lpHolders.reduce((acc: number, holder: any) => 
+            acc + (holder.is_locked ? Number(holder.percent) * 100 : 0), 0
+          );
+          if (totalLocked < 90) return false;
+        } catch {
+          return false;
+        }
+      }
       
       // Apply min holders filter
       if (currentFilters.minHolders > 0 && token.gpHolderCount < currentFilters.minHolders) {
@@ -436,65 +453,118 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
     const trends = () => tokenTrends().get(props.token.tokenAddress) || { liquidity: 'stagnant', holders: 'stagnant' };
     
     return (
-      <div class={`w-full bg-black/40 backdrop-blur-sm rd-lg border border-gray-700/50 hover:border-gray-600/50 transition-all duration-200 p-4 grid grid-cols-12 gap-4 items-center text-white mb-6`}>
+      <div 
+        onClick={(e) => handleTokenClick(props.token.tokenAddress, e)}
+        class="w-full bg-black/20 backdrop-blur-sm rd-lg border border-gray-700/50 hover:border-gray-600/50 transition-all duration-200 p-4 grid grid-cols-12 gap-4 items-center text-white cursor-pointer"
+      >
+        {/* Name and Symbol */}
         <div class="col-span-2">
           <div class="flex flex-col">
-            <div class="flex items-center gap-1 mb-1">
-              <div class="fw-600 truncate">{props.token.tokenName}</div>
-              <div class="flex shrink-0">
-                <TrendBadge 
-                  trend={trends().liquidity} 
-                  type="Liq" 
-                />
-                <TrendBadge 
-                  trend={trends().holders} 
-                  type="Holders" 
-                />
-              </div>
-            </div>
+            <div class="fw-600 truncate">{props.token.tokenName}</div>
             <div class="text-sm text-gray-400 truncate">{props.token.tokenSymbol}</div>
           </div>
         </div>
-        <div class="col-span-2 truncate text-sm">
-          <div class="text-gray-400">Address:</div>
-          <div>{props.token.tokenAddress.slice(0, 8)}...{props.token.tokenAddress.slice(-6)}</div>
+
+        {/* Status Badges and Trends */}
+        <div class="col-span-3 flex items-center">
+          {/* Fixed width container for ownership badge */}
+          <div class="w-28 flex justify-center">
+            <div class={`shrink-0 px-2 py-0.5 rd text-xs ${
+              props.token.gpOwnerAddress === '0x0000000000000000000000000000000000000000'
+                ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                : 'bg-red-500/20 text-red-300 border border-red-500/30'
+            }`}>
+              {props.token.gpOwnerAddress === '0x0000000000000000000000000000000000000000' ? 'Renounced' : 'Owned'}
+            </div>
+          </div>
+
+          {/* Fixed width container for liquidity lock badge */}
+          <div class="w-36 flex justify-center">
+            <div class={`shrink-0 px-2 py-0.5 rd text-xs min-w-[120px] whitespace-nowrap text-center ${(() => {
+              try {
+                const lpHolders = JSON.parse(props.token.gpLpHolders || '[]');
+                const totalLocked = lpHolders.reduce((acc: number, holder: any) => 
+                  acc + (holder.is_locked ? Number(holder.percent) * 100 : 0), 0
+                );
+                return totalLocked > 90 
+                  ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                  : 'bg-red-500/20 text-red-300 border border-red-500/30';
+              } catch {
+                return 'bg-red-500/20 text-red-300 border border-red-500/30';
+              }
+            })()}`}>
+              {(() => {
+                try {
+                  const lpHolders = JSON.parse(props.token.gpLpHolders || '[]');
+                  const totalLocked = lpHolders.reduce((acc: number, holder: any) => 
+                    acc + (holder.is_locked ? Number(holder.percent) * 100 : 0), 0
+                  );
+                  return `${totalLocked.toFixed(1)}% Locked`;
+                } catch {
+                  return 'Not Locked';
+                }
+              })()}
+            </div>
+          </div>
+
+          {/* Fixed width container for trend badges */}
+          <div class="flex-1 flex justify-end pr-2">
+            <div class="flex shrink-0 items-center gap-1">
+              <TrendBadge 
+                trend={trends().liquidity} 
+                type="Liq" 
+              />
+              <TrendBadge 
+                trend={trends().holders} 
+                type="Holders" 
+              />
+            </div>
+          </div>
         </div>
-        <div class="col-span-1 text-sm">
-          <div class="text-gray-400">Age:</div>
-          <div>{props.token.tokenAgeHours.toFixed(1)}h</div>
+
+        {/* Age */}
+        <div class="col-span-1 flex flex-col">
+          <div class="text-xs text-gray-400">Age</div>
+          <div class="px-2 py-0.5 rd text-xs bg-yellow-500/10 text-yellow-300 border border-yellow-500/30 inline-block mt-1">
+            {(() => {
+              const totalMinutes = Math.round(props.token.tokenAgeHours * 60);
+              const hours = Math.floor(totalMinutes / 60);
+              const minutes = totalMinutes % 60;
+              if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+              }
+              return `${minutes}m`;
+            })()}
+          </div>
         </div>
-        <div class="col-span-1 text-sm">
-          <div class="text-gray-400">Liquidity:</div>
-          <div>${props.token.hpLiquidityAmount.toLocaleString()}</div>
+
+        {/* Other Info */}
+        <div class="col-span-1 flex flex-col">
+          <div class="text-xs text-gray-400">Liquidity</div>
+          <div class="text-sm mt-1">${props.token.hpLiquidityAmount.toLocaleString()}</div>
         </div>
-        <div class="col-span-1 text-sm">
-          <div class="text-gray-400">Holders:</div>
-          <div>{props.token.gpHolderCount.toLocaleString()}</div>
+        <div class="col-span-1 flex flex-col">
+          <div class="text-xs text-gray-400">Holders</div>
+          <div class="text-sm mt-1">{props.token.gpHolderCount.toLocaleString()}</div>
         </div>
-        <div class="col-span-1 text-sm">
-          <div class="text-gray-400">Buy Tax:</div>
-          <div>{props.token.gpBuyTax}%</div>
+        <div class="col-span-1 flex flex-col">
+          <div class="text-xs text-gray-400">Buy Tax</div>
+          <div class="text-sm mt-1">{props.token.gpBuyTax}%</div>
         </div>
-        <div class="col-span-1 text-sm">
-          <div class="text-gray-400">Sell Tax:</div>
-          <div>{props.token.gpSellTax}%</div>
+        <div class="col-span-1 flex flex-col">
+          <div class="text-xs text-gray-400">Sell Tax</div>
+          <div class="text-sm mt-1">{props.token.gpSellTax}%</div>
         </div>
-        <div class="col-span-2">
-          <div class={`text-center px-3 py-1 rd-full text-sm fw-600 ${
+
+        {/* Risk Level */}
+        <div class="col-span-2 flex justify-end">
+          <div class={`text-center px-3 py-1 rd-full text-xs fw-600 w-28 ${
             props.token.riskLevel === 'safe' ? 'bg-green-100 text-green-800 border border-green-200' :
             props.token.riskLevel === 'warning' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
             'bg-red-100 text-red-800 border border-red-200'
           }`}>
             {props.token.hpIsHoneypot ? 'HONEYPOT' : props.token.riskLevel.toUpperCase()}
           </div>
-        </div>
-        <div class="col-span-1">
-          <button 
-            class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rd text-sm text-white transition-colors"
-            onClick={() => toggleTokenExpansion(props.token.tokenAddress)}
-          >
-            Expand
-          </button>
         </div>
       </div>
     );
@@ -599,11 +669,13 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
     localStorage.setItem(DYNAMIC_SCALING_KEY, isDynamicScaling().toString());
   });
 
+  const [viewMode, setViewMode] = createSignal<'list' | 'grid'>('list');
+
   return (
-    <div class="flex flex-col h-screen">
-      {/* Filters Container */}
-      <div class="sticky top-0 z-50 bg-gradient-to-b from-black/95 to-black/90 backdrop-blur-xl border-b border-gray-800">
+    <div class="min-h-full">
+      <div class="sticky top-0 z-50 bg-black/20 backdrop-blur-sm border-b border-gray-800">
         <div class="max-w-[1820px] mx-auto px-6 py-4">
+          {/* Top row with main controls */}
           <div class="mb-4 flex justify-between items-center">
             <div class="flex items-center gap-4">
               <div class="text-white text-lg fw-600">Token List</div>
@@ -647,31 +719,15 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
                 <Activity size={16} />
                 <span>Dynamic Scaling: {isDynamicScaling() ? 'On' : 'Off'}</span>
               </button>
-            </div>
-            <div class="flex gap-8 text-white/90">
-              <span>Total tokens: {props.tokens.length}</span>
-              <span>Filtered: {filteredTokens().length}</span>
-              <span>Expanded: {expandedTokens().size}</span>
-            </div>
-          </div>
-
-          {/* Filters Grid */}
-          <div class="grid grid-cols-12 gap-4">
-            {/* Search Input - Spans 3 columns */}
-            <div class="col-span-3">
               <input
                 type="text"
                 placeholder="Search tokens..."
-                class="w-full px-3 py-2 bg-gray-800/50 rd border border-gray-700 text-white"
+                class="max-w-[240px] px-3 py-2 bg-gray-800/50 rd border border-gray-700 text-white"
                 value={filters().searchQuery}
                 onInput={(e) => updateFilters(f => ({ ...f, searchQuery: e.currentTarget.value }))}
               />
-            </div>
-
-            {/* Sort Dropdown - Spans 3 columns */}
-            <div class="col-span-3">
               <select
-                class="w-full px-3 py-2 bg-gray-800/50 rd border border-gray-700 text-white"
+                class="max-w-[240px] px-3 py-2 bg-gray-800/50 rd border border-gray-700 text-white"
                 value={filters().sortBy}
                 onChange={(e) => updateFilters(f => ({ ...f, sortBy: e.currentTarget.value as any }))}
               >
@@ -684,94 +740,197 @@ export const TokenEventsList: Component<TokenEventsListProps> = (props) => {
                 <option value="safetyScore">Sort by Safety</option>
               </select>
             </div>
+            <div class="flex gap-8 text-white/90 items-center">
+              <span>Total tokens: {props.tokens.length}</span>
+              <span>Filtered: {filteredTokens().length}</span>
+              <span>Expanded: {expandedTokens().size}</span>
+              <div class="flex items-center gap-2 ml-4">
+                <button
+                  onClick={() => setViewMode('list')}
+                  class={`p-2 rd hover:bg-gray-700/50 ${viewMode() === 'list' ? 'bg-gray-700/50' : ''}`}
+                  title="List View"
+                >
+                  <List size={20} class="text-white" />
+                </button>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  class={`p-2 rd hover:bg-gray-700/50 ${viewMode() === 'grid' ? 'bg-gray-700/50' : ''}`}
+                  title="Grid View"
+                >
+                  <LayoutGrid size={20} class="text-white" />
+                </button>
+              </div>
+            </div>
+          </div>
 
-            {/* Risk Level Filters - Spans 4 columns */}
-            <div class="col-span-4 flex items-center gap-4">
-              <div class="flex items-center space-x-2">
+          {/* Bottom row with filters */}
+          <div class="grid grid-cols-12 gap-4">
+            {/* Risk Level Filters and Min Filters - Spans 12 columns */}
+            <div class="col-span-12 flex items-center gap-3">
+              <div class="flex items-center space-x-1.5">
                 <input
                   type="checkbox"
                   id="hideHoneypots"
                   checked={filters().hideHoneypots}
                   onChange={(e) => updateFilters(f => ({ ...f, hideHoneypots: e.currentTarget.checked }))}
                 />
-                <label for="hideHoneypots" class="text-white/90">Hide Honeypots</label>
+                <label for="hideHoneypots" class="text-white/90 text-xs">Hide Honeypots</label>
               </div>
 
-              <div class="flex items-center space-x-2">
+              <div class="flex items-center space-x-1.5">
                 <input
                   type="checkbox"
                   id="hideWarning"
                   checked={filters().hideWarning}
                   onChange={(e) => updateFilters(f => ({ ...f, hideWarning: e.currentTarget.checked }))}
                 />
-                <label for="hideWarning" class="text-white/90">Hide Warning</label>
+                <label for="hideWarning" class="text-white/90 text-xs">Hide Warning</label>
               </div>
 
-              <div class="flex items-center space-x-2">
+              <div class="flex items-center space-x-1.5">
                 <input
                   type="checkbox"
                   id="hideDanger"
                   checked={filters().hideDanger}
                   onChange={(e) => updateFilters(f => ({ ...f, hideDanger: e.currentTarget.checked }))}
                 />
-                <label for="hideDanger" class="text-white/90">Hide Danger</label>
+                <label for="hideDanger" class="text-white/90 text-xs">Hide Danger</label>
               </div>
-            </div>
 
-            {/* Min Filters and View Toggle - Spans 2 columns */}
-            <div class="col-span-2 flex items-center justify-end gap-4">
-              <div class="flex items-center gap-2">
-                <span class="text-white/60 text-xs whitespace-nowrap">Min:</span>
+              <div class="flex items-center space-x-1.5">
                 <input
-                  type="number"
-                  placeholder="Holders"
-                  class="w-20 px-2 py-1 bg-gray-800/50 rd border border-gray-700 text-white text-sm"
-                  value={filters().minHolders}
-                  onInput={(e) => updateFilters(f => ({ ...f, minHolders: parseInt(e.currentTarget.value) || 0 }))}
+                  type="checkbox"
+                  id="hideNotRenounced"
+                  checked={filters().hideNotRenounced}
+                  onChange={(e) => updateFilters(f => ({ ...f, hideNotRenounced: e.currentTarget.checked }))}
                 />
+                <label for="hideNotRenounced" class="text-white/90 text-xs">Hide Not Renounced</label>
+              </div>
+
+              <div class="flex items-center space-x-1.5">
                 <input
-                  type="number"
-                  placeholder="Liq($)"
-                  class="w-20 px-2 py-1 bg-gray-800/50 rd border border-gray-700 text-white text-sm"
-                  value={filters().minLiquidity}
-                  onInput={(e) => updateFilters(f => ({ ...f, minLiquidity: parseInt(e.currentTarget.value) || 0 }))}
+                  type="checkbox"
+                  id="hideUnlockedLiquidity"
+                  checked={filters().hideUnlockedLiquidity}
+                  onChange={(e) => updateFilters(f => ({ ...f, hideUnlockedLiquidity: e.currentTarget.checked }))}
                 />
+                <label for="hideUnlockedLiquidity" class="text-white/90 text-xs">Hide Unlocked Liquidity</label>
+              </div>
+
+              <div class="h-4 w-px bg-gray-700"></div>
+
+              <div class="flex items-center gap-3">
+                <div class="flex items-center gap-1.5">
+                  <label for="minHolders" class="text-white/90 text-xs">Min Holders:</label>
+                  <input
+                    id="minHolders"
+                    type="number"
+                    placeholder="0"
+                    class="w-20 px-2 py-1 bg-gray-800/50 rd border border-gray-700 text-white text-sm"
+                    value={filters().minHolders}
+                    onInput={(e) => updateFilters(f => ({ ...f, minHolders: parseInt(e.currentTarget.value) || 0 }))}
+                  />
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <label for="minLiquidity" class="text-white/90 text-xs">Min Liquidity ($):</label>
+                  <input
+                    id="minLiquidity"
+                    type="number"
+                    placeholder="0"
+                    class="w-20 px-2 py-1 bg-gray-800/50 rd border border-gray-700 text-white text-sm"
+                    value={filters().minLiquidity}
+                    onInput={(e) => updateFilters(f => ({ ...f, minLiquidity: parseInt(e.currentTarget.value) || 0 }))}
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* List Container - Flexbox Layout */}
+      {/* List Container */}
       <div 
         ref={scrollContainerRef}
         class="flex-1 overflow-auto"
       >
-        <div class="max-w-[1400px] mx-auto px-4 py-4">
-          {/* Stack tokens vertically with margins */}
-          <div class="flex flex-col gap-4">
-            {filteredTokens().map((token, index) => {
-              const isExpanded = expandedTokens().has(token.tokenAddress);
-              
-              return (
-                <div
-                  data-index={index}
-                  data-token={token.tokenAddress}
-                  class={`w-full transition-all duration-300 ease-in-out ${
-                    isExpanded ? 'relative z-10' : 'z-0'
-                  }`}
-                >
-                  <TokenEventCard
-                    token={token}
-                    expanded={isExpanded}
-                    onToggleExpand={(e) => handleTokenClick(token.tokenAddress, e)}
-                    trends={tokenTrends().get(token.tokenAddress)}
-                    dynamicScaling={isDynamicScaling()}
-                  />
+        <div class={`mx-auto px-6 pt-6 transition-all duration-300 ${
+          viewMode() === 'grid' && expandedTokens().size > 0 
+            ? 'max-w-[3600px] w-[90vw]' 
+            : 'max-w-[1820px]'
+        }`}>
+          {viewMode() === 'list' ? (
+            // List View
+            <div class="flex flex-col gap-4">
+              {filteredTokens().map((token, index) => {
+                const isExpanded = expandedTokens().has(token.tokenAddress);
+                
+                return (
+                  <div
+                    data-index={index}
+                    data-token={token.tokenAddress}
+                    class={`w-full transition-all duration-300 ease-in-out ${
+                      isExpanded ? 'relative z-10' : 'z-0'
+                    }`}
+                  >
+                    {isExpanded ? (
+                      <TokenEventCard
+                        token={token}
+                        expanded={true}
+                        onToggleExpand={(e) => handleTokenClick(token.tokenAddress, e)}
+                        trends={tokenTrends().get(token.tokenAddress)}
+                        dynamicScaling={isDynamicScaling()}
+                      />
+                    ) : (
+                      <CompactRow token={token} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            // Grid View
+            <div class="relative">
+              {expandedTokens().size > 0 ? (
+                // Show expanded card in full width container
+                <div class="w-full">
+                  {filteredTokens().map((token, index) => {
+                    const isExpanded = expandedTokens().has(token.tokenAddress);
+                    return isExpanded ? (
+                      <div 
+                        data-index={index}
+                        data-token={token.tokenAddress}
+                        class="w-full transition-all duration-300"
+                      >
+                        <TokenEventCard
+                          token={token}
+                          expanded={true}
+                          onToggleExpand={(e) => handleTokenClick(token.tokenAddress, e)}
+                          trends={tokenTrends().get(token.tokenAddress)}
+                          dynamicScaling={isDynamicScaling()}
+                        />
+                      </div>
+                    ) : null;
+                  })}
                 </div>
-              );
-            })}
-          </div>
+              ) : (
+                // Show grid of tiles
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredTokens().map((token, index) => (
+                    <div
+                      data-index={index}
+                      data-token={token.tokenAddress}
+                    >
+                      <TokenTileCard
+                        token={token}
+                        onClick={(e) => handleTokenClick(token.tokenAddress, e)}
+                        trends={tokenTrends().get(token.tokenAddress)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
